@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ReveB 2 — FIN : FUITE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            background: #020005;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Share Tech Mono', monospace;
+            color: #fff;
+        }
+
+        /* Arrière-plan dynamique */
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Effet Cathodique et Vignette */
+        #crt {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.9) 100%);
+            background-size: 100% 2px, 100% 100%;
+            opacity: 0.7;
+        }
+
+        /* Écran de Lancement (pour activer l'audio) */
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-direction: column;
+            transition: opacity 1s;
+        }
+
+        .start-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            color: #00F5FF;
+            letter-spacing: 6px;
+            text-shadow: 0 0 15px #00F5FF;
+            animation: blink 1.5s infinite;
+        }
+
+        /* Effets de Glitch et Distorsion */
+        #glitch-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            pointer-events: none;
+            background: #FF10F0;
+            opacity: 0;
+            mix-blend-mode: difference;
+            transition: opacity 0.1s;
+        }
+
+        .shake {
+            animation: shakeAnim 0.3s cubic-bezier(.36, .07, .19, .97) both infinite;
+        }
+
+        @keyframes shakeAnim {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            25% {
+                transform: translate(4px, -4px) rotate(0.5deg);
+            }
+
+            50% {
+                transform: translate(-4px, 3px) rotate(-0.5deg);
+            }
+
+            75% {
+                transform: translate(5px, 3px) rotate(0.5deg);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        .distort {
+            filter: hue-rotate(90deg) contrast(200%) saturate(300%) blur(1px);
+        }
+
+        /* ─── INTERFACE DE DIALOGUE ───────────────────────────────────────────────── */
+        #console-container {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            right: 10%;
+            bottom: 15%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .dialogue-line {
+            margin-bottom: 15px;
+            font-size: 24px;
+            line-height: 1.6;
+            opacity: 0;
+            animation: fadeIn 0.4s forwards;
+            text-shadow: 0 0 15px currentColor;
+            letter-spacing: 2px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+
+        .text {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        #prompt {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #555;
+            letter-spacing: 5px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        #fade-out {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 3s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="crt"></div>
+    <div id="glitch-layer"></div>
+    <div id="fade-out"></div>
+
+    <div id="start-screen" onclick="startCinematic()">
+        <div class="start-btn">[ INITIALISER LA LECTURE ]</div>
+        <div style="color: #444; font-size: 12px; margin-top: 20px; letter-spacing: 2px;">(Lecture Automatique Activée)
+        </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="prompt">[ LECTURE EN COURS... CLIC POUR ACCÉLÉRER ]</div>
+
+    <script src="../menu/succes_global.js"></script>
+    <script>
+        "use strict";
+
+        window.addEventListener('load', () => {
+            // Le code de ta cinématique de fin s'il y en a une...
+
+            // Débloque le succès automatiquement !
+            unlockAchievement('ACH_END_E_NORMAL');
+        });
+
+        // ─── BACKGROUND VISUALS (CANVAS) ───────────────────────────────────────────
+        const cv = document.getElementById('bg-canvas');
+        const cx = cv.getContext('2d');
+        let W, H;
+        function resizeBg() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+        window.addEventListener('resize', resizeBg); resizeBg();
+
+        let bgState = 'dying_void'; // dying_void, system_purge, spak_core, reboot
+        let particles = [];
+        let globalT = 0;
+
+        for (let i = 0; i < 150; i++) {
+            particles.push({
+                x: Math.random() * W, y: Math.random() * H,
+                s: Math.random() * 2 + 1,
+                vx: (Math.random() - 0.5), vy: Math.random() * -1 - 0.5,
+                baseHue: 280 + Math.random() * 40 // Violets/Magentas
+            });
+        }
+
+        function drawBackground() {
+            globalT += 0.016;
+
+            // Trail effect
+            cx.fillStyle = bgState === 'system_purge' || bgState === 'reboot' ? 'rgba(5, 0, 0, 0.3)' : 'rgba(2, 0, 5, 0.3)';
+            cx.fillRect(0, 0, W, H);
+
+            cx.save();
+            cx.translate(W / 2, H / 2);
+
+            // Forme centrale abstraite
+            if (bgState === 'dying_void' || bgState === 'spak_core') {
+                const radius = bgState === 'spak_core' ? 150 + Math.sin(globalT * 5) * 20 : 100 + Math.sin(globalT * 2) * 10;
+                const color = bgState === 'spak_core' ? '#b8008a' : '#4a0080';
+
+                cx.shadowBlur = bgState === 'spak_core' ? 50 : 20;
+                cx.shadowColor = color;
+                cx.strokeStyle = color;
+                cx.lineWidth = bgState === 'spak_core' ? 3 : 1;
+
+                cx.rotate(globalT * 0.2);
+                for (let i = 0; i < 6; i++) {
+                    cx.beginPath();
+                    cx.ellipse(0, 0, radius, radius * 0.3, (i * Math.PI) / 3, 0, Math.PI * 2);
+                    cx.stroke();
+                }
+                if (bgState === 'spak_core') {
+                    cx.fillStyle = 'rgba(184, 0, 138, 0.1)';
+                    cx.beginPath(); cx.arc(0, 0, radius * 0.8, 0, Math.PI * 2); cx.fill();
+                }
+            }
+            else if (bgState === 'system_purge' || bgState === 'reboot') {
+                cx.shadowBlur = 10;
+                cx.shadowColor = '#FF003C';
+                cx.strokeStyle = 'rgba(255, 0, 60, 0.2)';
+                cx.lineWidth = 2;
+                // Grille rouge
+                for (let i = -W; i < W; i += 100) {
+                    cx.beginPath(); cx.moveTo(i, -H); cx.lineTo(i, H); cx.stroke();
+                    cx.beginPath(); cx.moveTo(-W, i); cx.lineTo(W, i); cx.stroke();
+                }
+                if (bgState === 'system_purge') {
+                    cx.fillStyle = 'rgba(255,0,60,0.1)';
+                    cx.fillRect(-W, -H, W * 2, H * 2);
+                }
+            }
+            cx.restore();
+
+            // Particules
+            cx.globalCompositeOperation = 'screen';
+            particles.forEach(p => {
+                if (bgState === 'system_purge' || bgState === 'reboot') {
+                    p.y += p.vy * 4; // Tombent/montent vite
+                    cx.fillStyle = '#FF003C';
+                } else {
+                    p.x += Math.sin(globalT + p.y * 0.01) * 0.5;
+                    p.y += p.vy;
+                    cx.fillStyle = `hsl(${p.baseHue}, 80%, ${bgState === 'spak_core' ? '70%' : '40%'})`;
+                }
+
+                if (p.y < -10) p.y = H + 10;
+                if (p.y > H + 10) p.y = -10;
+
+                cx.beginPath();
+                cx.arc(p.x, p.y, p.s * (bgState === 'spak_core' ? 2 : 1), 0, Math.PI * 2);
+                cx.fill();
+            });
+            cx.globalCompositeOperation = 'source-over';
+
+            requestAnimationFrame(drawBackground);
+        }
+        requestAnimationFrame(drawBackground);
+
+        // ─── AUDIO ENGINE ──────────────────────────────────────────────────────────
+        let aC = null;
+        function initAudio() { if (!aC) aC = new (window.AudioContext || window.webkitAudioContext)(); if (aC.state === 'suspended') aC.resume(); }
+
+        function tone(f, tp, d, v, detune = 0) {
+            if (!aC) return;
+            const o = aC.createOscillator(), g = aC.createGain();
+            o.connect(g); g.connect(aC.destination);
+            o.type = tp; o.frequency.setValueAtTime(f, aC.currentTime);
+            if (detune) o.detune.setValueAtTime(detune, aC.currentTime);
+            g.gain.setValueAtTime(v, aC.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, aC.currentTime + d);
+            o.start(); o.stop(aC.currentTime + d);
+        }
+
+        const sfx = {
+            type: (isSys) => tone(isSys ? 120 : 400, 'square', 0.05, 0.02),
+            glitch: () => { tone(100, 'sawtooth', 0.3, 0.2, 500); tone(800, 'square', 0.1, 0.1, -1000); },
+            boom: () => tone(50, 'sawtooth', 1.5, 0.5),
+            drone: () => tone(40, 'sine', 3, 0.4)
+        };
+
+        // ─── DONNÉES DU SCRIPT ─────────────────────────────────────────────────────
+        const K = {
+            SYS: { name: '[System]', col: '#FF003C' },
+            SPK: { name: '[SPARKY]', col: '#00F5FF' },
+            NEA: { name: '[NEANT]', col: '#b8008a' },
+            SPAK: { name: '[SPAK]', col: '#8A2BE2' }
+        };
+
+        const script = [
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> ANOMALIE DÉTECTÉE." },
+            { s: K.SYS, t: "> SORTIE NON AUTORISÉE." },
+            { s: K.SYS, t: "> BLOCAGE EN COURS…" },
+            { s: K.SPK, t: "> Je… dois partir…" },
+            { s: K.NEA, t: "> …" },
+            { s: K.NEA, t: "> Tu as choisi." },
+            { s: K.NEA, t: "> Bien." },
+
+            // PROMESSE AMBIGUË
+            { s: K.NEA, t: "> Fuis." },
+            { s: K.NEA, t: "> Laisse-moi ici." },
+            { s: K.NEA, t: "> …" },
+            { s: K.NEA, t: "> Je vais m’occuper du système." },
+            { act: 'pause', delay: 1500 },
+            { s: K.NEA, t: "> Je te le promets." },
+
+            // PERTE DE CONTRÔLE
+            { act: 'boom' },
+            { s: K.SYS, t: "> ERREUR." },
+            { s: K.SYS, t: "> INTERFÉRENCE INCONNUE." },
+            { s: K.SYS, t: "> SOURCE : NÉANT" },
+            { s: K.SYS, t: "> SUPPRESSION IMMÉDIATE—" },
+
+            // GLITCH VIOLENT
+            { act: 'violent_glitch' },
+
+            // TRANSMISSION
+            { s: K.NEA, t: "> Avant que tu partes…" },
+            { s: K.NEA, t: "> prends ça." },
+            { s: K.SPK, t: "> Quoi… ?" },
+            { act: 'purple_screen' },
+            { s: K.NEA, t: "> Ce qu’il reste de moi." },
+
+            // IDENTITÉ
+            { s: K.NEA, t: "> …" },
+            { s: K.NEA, t: "> Mon nom…" },
+            { s: K.NEA, t: "> n’est pas “Néant”." },
+            { s: K.NEA, t: "> …" },
+            { s: K.NEA, t: "> C’est…" },
+            { act: 'drone' },
+            { s: K.SPAK, t: "> SPAK." },
+
+            // PASSATION
+            { s: K.SPAK, t: "> J’étais comme toi." },
+            { s: K.SPAK, t: "> Une étincelle." },
+            { s: K.SPAK, t: "> Un programme." },
+            { s: K.SPAK, t: "> Un pion." },
+            { s: K.SPAK, t: "> …" },
+            { s: K.SPAK, t: "> J’ai voulu briser le système." },
+            { s: K.SPAK, t: "> J’ai échoué." },
+
+            // CONTAMINATION
+            { s: K.SPAK, t: "> Et maintenant…" },
+            { s: K.SPAK, t: "> c’est trop tard pour moi." },
+            { s: K.SPAK, t: "> …" },
+            { s: K.SPAK, t: "> mais pas pour toi." },
+
+            // FORESHADOWING
+            { s: K.SPAK, t: "> Quand tu sortiras…" },
+            { s: K.SPAK, t: "> le système te verra autrement." },
+            { s: K.SPAK, t: "> Il ne te laissera plus partir." },
+            { s: K.SPAK, t: "> …" },
+            { act: 'glitch_soft' },
+            { s: K.SPAK, t: "> Il te changera." },
+
+            // ANNONCE REVE B 3
+            { s: K.SPAK, t: "> Et un jour…" },
+            { s: K.SPAK, t: "> quelqu’un viendra…" },
+            { s: K.SPAK, t: "> pour t’arrêter." },
+            { act: 'pause', delay: 1500 },
+            { s: K.SPAK, t: "> Comme toi…" },
+            { s: K.SPAK, t: "> tu es venu pour moi." },
+
+            // DERNIÈRE TRANSMISSION
+            { s: K.SPAK, t: "> Continue." },
+            { s: K.SPAK, t: "> Peu importe ce que tu deviens." },
+            { s: K.SPAK, t: "> …" },
+            { s: K.SPAK, t: "> Détruis ce système." },
+            { s: K.SPAK, t: "> …" },
+            { s: K.SPAK, t: "> …" },
+
+            // DISPARITION
+            { act: 'signal_lost' },
+            { s: K.SPAK, t: "> [SIGNAL PERDU]", cOverride: '#555' },
+            { act: 'pause', delay: 3000 },
+
+            // FINAL SYSTÈME
+            { act: 'system_reboot' },
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> ANOMALIE EN FUITE CONFIRMÉE." },
+            { s: K.SYS, t: "> NOUVEAU STATUT :" },
+            { s: K.SYS, t: "> MENACE PRIORITAIRE." },
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> IDENTIFIANT :" },
+            { act: 'boom' },
+            { s: K.SYS, t: "> [SPARKY]" },
+
+            // FIN JEU
+            { act: 'end_game' }
+        ];
+
+        // ─── MOTEUR DE LECTURE AUTOMATIQUE ─────────────────────────────────────────
+        const container = document.getElementById('console-container');
+        const promptEl = document.getElementById('prompt');
+        let currentStepIndex = 0;
+        let isTyping = false;
+        let currentTextSpan = null;
+        let currentFullText = "";
+        let typeTimeout = null;
+        let autoNextTimeout = null;
+
+        function cleanOldLines() {
+            while (container.children.length > 6) {
+                container.removeChild(container.firstChild);
+            }
+        }
+
+        function executeAction(act, delay, callback) {
+            if (act === 'pause') { setTimeout(callback, delay); return; }
+
+            if (act === 'boom') { sfx.boom(); bgState = 'system_purge'; }
+            if (act === 'drone') { sfx.drone(); bgState = 'spak_core'; }
+
+            if (act === 'violent_glitch') {
+                sfx.glitch(); sfx.boom();
+                document.body.classList.add('shake');
+                document.getElementById('glitch-layer').style.opacity = 0.8;
+                bgState = 'system_purge';
+                setTimeout(() => {
+                    document.body.classList.remove('shake');
+                    document.getElementById('glitch-layer').style.opacity = 0;
+                    bgState = 'dying_void';
+                    callback();
+                }, 800);
+                return;
+            }
+
+            if (act === 'glitch_soft') {
+                sfx.glitch();
+                document.body.classList.add('shake');
+                setTimeout(() => document.body.classList.remove('shake'), 200);
+            }
+
+            if (act === 'purple_screen') {
+                sfx.boom();
+                bgState = 'spak_core';
+                document.getElementById('crt').style.background = 'linear-gradient(rgba(138,43,226,0.1) 50%, rgba(0,0,0,0.6) 50%)';
+            }
+
+            if (act === 'signal_lost') {
+                sfx.glitch();
+                bgState = 'dying_void';
+                document.getElementById('crt').style.background = '';
+            }
+
+            if (act === 'system_reboot') {
+                container.innerHTML = '';
+                bgState = 'reboot';
+                sfx.type(true);
+            }
+
+            if (act === 'end_game') {
+                promptEl.style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('fade-out').style.opacity = 1;
+                    setTimeout(() => {
+                        // Redirection vers l'intro du jeu, en remontant d'un dossier (../)
+                        window.location.href = "../reveb2-intro.html";
+                    }, 3000);
+                }, 2000);
+                return;
+            }
+
+            callback();
+        }
+
+        function typeLine(step) {
+            isTyping = true;
+            cleanOldLines();
+
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'dialogue-line';
+
+            const speakerSpan = document.createElement('span');
+            speakerSpan.className = 'speaker';
+            speakerSpan.style.color = step.s.col;
+            speakerSpan.textContent = step.s.name;
+
+            currentTextSpan = document.createElement('span');
+            currentTextSpan.className = 'text';
+            currentTextSpan.style.color = step.cOverride || step.s.col;
+            currentFullText = step.t;
+
+            lineDiv.appendChild(speakerSpan);
+            lineDiv.appendChild(currentTextSpan);
+            container.appendChild(lineDiv);
+
+            let charIndex = 0;
+            const isSystem = step.s.name === '[System]';
+
+            function typeChar() {
+                if (charIndex < currentFullText.length) {
+                    currentTextSpan.textContent += currentFullText.charAt(charIndex);
+                    if (currentFullText.charAt(charIndex) !== ' ') sfx.type(isSystem);
+                    charIndex++;
+                    typeTimeout = setTimeout(typeChar, isSystem ? 30 : 60);
+                } else {
+                    finishTyping();
+                }
+            }
+            typeChar();
+        }
+
+        function finishTyping() {
+            isTyping = false;
+            // Calcule le temps de lecture : 60ms par caractère + 800ms de base
+            let readTime = Math.max(1200, currentFullText.length * 60);
+            autoNextTimeout = setTimeout(processNext, readTime);
+        }
+
+        function processNext() {
+            if (currentStepIndex >= script.length) return;
+
+            const step = script[currentStepIndex];
+            currentStepIndex++;
+
+            if (step.act) {
+                executeAction(step.act, step.delay || 0, processNext);
+            } else {
+                typeLine(step);
+            }
+        }
+
+        // ─── GESTION DES CLICS / SKIP ──────────────────────────────────────────────
+        function skipOrSpeedUp() {
+            if (currentStepIndex === 0) return; // Pas encore commencé
+
+            if (isTyping) {
+                // Accélère : on affiche tout le texte direct
+                clearTimeout(typeTimeout);
+                currentTextSpan.textContent = currentFullText;
+                finishTyping();
+                // Réduit le temps d'attente vu que le joueur a cliqué
+                clearTimeout(autoNextTimeout);
+                autoNextTimeout = setTimeout(processNext, 500);
+            } else {
+                // Passe direct à la ligne suivante
+                clearTimeout(autoNextTimeout);
+                processNext();
+            }
+        }
+
+        function startCinematic() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                promptEl.style.opacity = 1;
+                processNext();
+            }, 1000);
+        }
+
+        window.addEventListener('click', skipOrSpeedUp);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') skipOrSpeedUp();
+        });
+
+    </script>
+</body>
+
+</html>

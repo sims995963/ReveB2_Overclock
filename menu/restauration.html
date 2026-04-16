@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReveB 2 — RESTAURATION SESSION</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00F5FF;
+      --red: #FF003C;
+      --purple: #8A2BE2;
+      --green: #00FF41;
+      --gold: #FFD700;
+      --bg-dark: #010005;
+      --font-ui: 'Orbitron', sans-serif;
+      --font-term: 'Share Tech Mono', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--cyan);
+      font-family: var(--font-term);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      opacity: 0;
+      transition: opacity 0.8s;
+    }
+
+    body.visible {
+      opacity: 1;
+    }
+
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .15) 50%), linear-gradient(90deg, rgba(0, 245, 255, .02), rgba(255, 0, 60, .02), rgba(138, 43, 226, .02));
+      background-size: 100% 3px, 3px 100%;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.9) 100%);
+    }
+
+    #bg-grid {
+      position: absolute;
+      inset: -50%;
+      z-index: 0;
+      background-image: linear-gradient(rgba(0, 245, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 245, 255, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      transform: perspective(500px) rotateX(60deg) translateY(-100px) translateZ(-200px);
+      animation: gridMove 10s linear infinite;
+    }
+
+    @keyframes gridMove {
+      from {
+        transform: perspective(500px) rotateX(60deg) translateY(0) translateZ(-200px);
+      }
+
+      to {
+        transform: perspective(500px) rotateX(60deg) translateY(40px) translateZ(-200px);
+      }
+    }
+
+    /* LAYOUT */
+    #ui {
+      position: relative;
+      z-index: 10;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 90px 1fr 55px;
+      grid-template-columns: 1fr 380px;
+      padding: 30px 50px;
+      gap: 0;
+      column-gap: 40px;
+    }
+
+    /* HEADER */
+    #header {
+      grid-column: 1/-1;
+      display: flex;
+      align-items: flex-end;
+      gap: 25px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(0, 245, 255, 0.2);
+      margin-bottom: 20px;
+    }
+
+    .back-btn {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: rgba(0, 245, 255, 0.5);
+      cursor: pointer;
+      border: 1px solid rgba(0, 245, 255, 0.2);
+      padding: 8px 15px;
+      transition: all 0.2s;
+      white-space: nowrap;
+      align-self: center;
+    }
+
+    .back-btn:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: rgba(0, 245, 255, 0.05);
+      box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
+    }
+
+    .page-title {
+      font-family: var(--font-ui);
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 12px;
+      text-shadow: 0 0 20px var(--cyan);
+    }
+
+    .page-subtitle {
+      font-size: 0.75rem;
+      color: rgba(0, 245, 255, 0.4);
+      letter-spacing: 3px;
+      align-self: flex-end;
+      margin-bottom: 4px;
+    }
+
+    /* SESSION LIST */
+    #session-list {
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 245, 255, 0.2) transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding-right: 10px;
+    }
+
+    .section-label {
+      font-size: 0.6rem;
+      color: rgba(0, 245, 255, 0.3);
+      letter-spacing: 4px;
+      margin-top: 8px;
+      margin-bottom: 4px;
+    }
+
+    .session-card {
+      border: 1px solid rgba(0, 245, 255, 0.15);
+      background: rgba(0, 8, 15, 0.7);
+      padding: 18px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .session-card::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 4px;
+    }
+
+    .session-card.ok::after {
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+    }
+
+    .session-card.warn::after {
+      background: var(--gold);
+      box-shadow: 0 0 8px var(--gold);
+    }
+
+    .session-card.corrupt::after {
+      background: var(--red);
+      box-shadow: 0 0 8px var(--red);
+      animation: corruptPulse 1.5s infinite;
+    }
+
+    .session-card.empty::after {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes corruptPulse {
+      50% {
+        box-shadow: 0 0 20px var(--red);
+      }
+    }
+
+    .session-card:hover {
+      border-color: rgba(0, 245, 255, 0.4);
+      background: rgba(0, 15, 25, 0.9);
+    }
+
+    .session-card.corrupt:hover {
+      border-color: rgba(255, 0, 60, 0.4);
+    }
+
+    .session-card.active {
+      border-color: var(--cyan);
+      background: rgba(0, 20, 35, 0.9);
+      box-shadow: inset 0 0 20px rgba(0, 245, 255, 0.05);
+    }
+
+    .session-card.empty {
+      cursor: default;
+      opacity: 0.4;
+    }
+
+    .session-card.empty:hover {
+      border-color: rgba(0, 245, 255, 0.15);
+      background: rgba(0, 8, 15, 0.7);
+    }
+
+    .sess-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
+    }
+
+    .sess-id {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+    }
+
+    .sess-card.ok .sess-id {
+      color: var(--cyan);
+    }
+
+    .sess-status {
+      font-size: 0.6rem;
+      font-family: var(--font-ui);
+      font-weight: 700;
+      padding: 2px 8px;
+      letter-spacing: 1px;
+    }
+
+    .status-ok {
+      color: var(--green);
+      border: 1px solid rgba(0, 255, 65, 0.3);
+    }
+
+    .status-warn {
+      color: var(--gold);
+      border: 1px solid rgba(255, 215, 0, 0.3);
+    }
+
+    .status-corrupt {
+      color: var(--red);
+      border: 1px solid rgba(255, 0, 60, 0.4);
+      animation: textFlick 2s infinite;
+    }
+
+    .status-empty {
+      color: rgba(255, 255, 255, 0.2);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    @keyframes textFlick {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .sess-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .meta-label {
+      font-size: 0.55rem;
+      color: rgba(0, 245, 255, 0.3);
+      letter-spacing: 2px;
+      margin-bottom: 2px;
+    }
+
+    .meta-value {
+      font-size: 0.72rem;
+      color: rgba(200, 220, 255, 0.7);
+    }
+
+    .meta-value.critical {
+      color: var(--red);
+    }
+
+    .meta-value.warn {
+      color: var(--gold);
+    }
+
+    .sess-corruption {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .corruption-label {
+      font-size: 0.58rem;
+      color: rgba(0, 245, 255, 0.3);
+      letter-spacing: 2px;
+      white-space: nowrap;
+    }
+
+    .corruption-bar {
+      flex: 1;
+      height: 2px;
+      background: rgba(0, 245, 255, 0.08);
+    }
+
+    .corruption-fill {
+      height: 100%;
+      transition: width 1s;
+    }
+
+    .fill-low {
+      background: var(--green);
+      box-shadow: 0 0 4px var(--green);
+    }
+
+    .fill-med {
+      background: var(--gold);
+      box-shadow: 0 0 4px var(--gold);
+    }
+
+    .fill-high {
+      background: var(--red);
+      box-shadow: 0 0 6px var(--red);
+      animation: corruptPulse 1.5s infinite;
+    }
+
+    .corruption-pct {
+      font-size: 0.65rem;
+      font-family: var(--font-ui);
+      min-width: 35px;
+      text-align: right;
+    }
+
+    .pct-low {
+      color: var(--green);
+    }
+
+    .pct-med {
+      color: var(--gold);
+    }
+
+    .pct-high {
+      color: var(--red);
+    }
+
+    /* RIGHT PANEL */
+    #detail-panel {
+      border: 1px solid rgba(0, 245, 255, 0.15);
+      background: rgba(0, 5, 12, 0.8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 15px 20px;
+      border-bottom: 1px solid rgba(0, 245, 255, 0.1);
+      background: rgba(0, 10, 20, 0.5);
+      font-family: var(--font-ui);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 4px;
+      color: rgba(0, 245, 255, 0.5);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    #no-selection {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: rgba(0, 245, 255, 0.15);
+    }
+
+    .no-sel-icon {
+      font-size: 2.5rem;
+    }
+
+    .no-sel-text {
+      font-family: var(--font-ui);
+      font-size: 0.7rem;
+      letter-spacing: 4px;
+    }
+
+    #session-detail {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: none;
+    }
+
+    .detail-title {
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: 5px;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+      margin-bottom: 20px;
+    }
+
+    .detail-section {
+      margin-bottom: 20px;
+    }
+
+    .detail-section-head {
+      font-size: 0.58rem;
+      color: rgba(0, 245, 255, 0.3);
+      letter-spacing: 3px;
+      margin-bottom: 10px;
+      border-bottom: 1px solid rgba(0, 245, 255, 0.07);
+      padding-bottom: 6px;
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 0;
+    }
+
+    .detail-key {
+      font-size: 0.68rem;
+      color: rgba(0, 245, 255, 0.45);
+    }
+
+    .detail-val {
+      font-size: 0.72rem;
+      color: rgba(200, 220, 255, 0.8);
+      font-family: var(--font-ui);
+      font-size: 0.65rem;
+    }
+
+    .last-log {
+      background: rgba(0, 10, 5, 0.6);
+      border: 1px solid rgba(0, 255, 65, 0.1);
+      border-left: 2px solid var(--green);
+      padding: 10px 12px;
+      font-size: 0.68rem;
+      color: rgba(0, 255, 65, 0.6);
+      line-height: 1.7;
+      margin-bottom: 5px;
+    }
+
+    .last-log.error {
+      border-left-color: var(--red);
+      color: rgba(255, 0, 60, 0.7);
+      background: rgba(10, 0, 0, 0.6);
+    }
+
+    .action-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 15px 20px;
+      border-top: 1px solid rgba(0, 245, 255, 0.1);
+    }
+
+    .action-btn {
+      font-family: var(--font-ui);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 12px 20px;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.2s;
+      text-align: center;
+    }
+
+    .action-btn.primary {
+      color: var(--cyan);
+      border-color: rgba(0, 245, 255, 0.5);
+    }
+
+    .action-btn.primary:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 25px rgba(0, 245, 255, 0.5);
+    }
+
+    .action-btn.danger {
+      color: var(--red);
+      border-color: rgba(255, 0, 60, 0.3);
+    }
+
+    .action-btn.danger:hover {
+      background: var(--red);
+      color: #000;
+      box-shadow: 0 0 20px rgba(255, 0, 60, 0.4);
+    }
+
+    .action-btn.disabled {
+      color: rgba(255, 255, 255, 0.15);
+      border-color: rgba(255, 255, 255, 0.07);
+      cursor: not-allowed;
+    }
+
+    /* FOOTER */
+    #footer {
+      grid-column: 1/-1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid rgba(0, 245, 255, 0.1);
+      margin-top: 10px;
+    }
+
+    .footer-info {
+      font-size: 0.65rem;
+      color: rgba(0, 245, 255, 0.25);
+      letter-spacing: 2px;
+    }
+
+    /* LOADING OVERLAY */
+    #load-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: #010005;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+    }
+
+    #load-overlay.show {
+      display: flex;
+    }
+
+    .load-title {
+      font-family: var(--font-ui);
+      font-size: 1.5rem;
+      font-weight: 900;
+      letter-spacing: 10px;
+      color: var(--cyan);
+      text-shadow: 0 0 20px var(--cyan);
+    }
+
+    .load-bar {
+      width: 400px;
+      height: 3px;
+      background: rgba(0, 245, 255, 0.1);
+    }
+
+    .load-fill {
+      height: 100%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      width: 0%;
+      transition: width 0.1s;
+    }
+
+    .load-msg {
+      font-size: 0.72rem;
+      color: rgba(0, 245, 255, 0.5);
+      letter-spacing: 3px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="crt"></div>
+  <div id="vignette"></div>
+  <div id="bg-grid"></div>
+
+  <!-- LOADING OVERLAY -->
+  <div id="load-overlay">
+    <div class="load-title">RESTAURATION EN COURS</div>
+    <div class="load-bar">
+      <div class="load-fill" id="load-fill"></div>
+    </div>
+    <div class="load-msg" id="load-msg">Initialisation...</div>
+  </div>
+
+  <div id="ui">
+    <div id="header">
+      <div class="back-btn" onclick="goBack()">◄ RETOUR</div>
+      <div>
+        <div class="page-title">RESTAURATION</div>
+      </div>
+      <div class="page-subtitle">GESTION DES SESSIONS // NOYAU v2.0.50</div>
+    </div>
+
+    <!-- SESSION LIST -->
+    <div id="session-list">
+    </div>
+
+    <!-- DETAIL PANEL -->
+    <div id="detail-panel">
+      <div class="panel-header">
+        <span>DÉTAILS DE SESSION</span>
+        <span id="panel-slot" style="color:rgba(0,245,255,0.3);">—</span>
+      </div>
+
+      <div id="no-selection">
+        <div class="no-sel-icon">⬡</div>
+        <div class="no-sel-text">SÉLECTIONNEZ UNE SESSION</div>
+      </div>
+
+      <div id="session-detail"></div>
+
+      <div class="action-btns" id="action-btns" style="display:none;">
+        <div class="action-btn primary" id="btn-load" onclick="loadSession()">► CHARGER LA SESSION</div>
+        <div class="action-btn danger" id="btn-delete" onclick="deleteSession()">✕ SUPPRIMER LA SESSION</div>
+      </div>
+    </div>
+
+    <div id="footer">
+      <div class="footer-info" id="footer-msg">AUCUNE SESSION SÉLECTIONNÉE</div>
+      <div class="footer-info">REVEB_OS v2.0.50 // SESSION_MODULE 1.9.7</div>
+    </div>
+  </div>
+
+  <script>
+    // --- GESTION AUDIO (Garde ton code existant) ---
+    const au = new (window.AudioContext || window.webkitAudioContext)();
+    function tone(f, tp, d, v) { try { let o = au.createOscillator(), g = au.createGain(); o.connect(g); g.connect(au.destination); o.type = tp; o.frequency.value = f; g.gain.setValueAtTime(v, au.currentTime); g.gain.exponentialRampToValueAtTime(0.001, au.currentTime + d); o.start(); o.stop(au.currentTime + d); } catch (e) { } }
+    const sfx = { hover: () => tone(440, 'square', 0.05, 0.02), click: () => tone(600, 'sine', 0.3, 0.05), error: () => { tone(150, 'sawtooth', 0.3, 0.1); tone(100, 'square', 0.4, 0.1); } };
+
+    document.addEventListener('click', () => au.resume(), { once: true });
+    // ----------------------------------------------
+
+    let SESSIONS = [];
+    let selectedSession = null;
+
+    // 1. INITIALISATION DU LOCALSTORAGE
+    function initStorage() {
+      const savedData = localStorage.getItem('reveb_saves');
+
+      if (savedData) {
+        // Si des sauvegardes existent, on les charge
+        SESSIONS = JSON.parse(savedData);
+      } else {
+        // Sinon, on crée 5 slots vides par défaut (et on simule une sauvegarde pour la démo)
+        SESSIONS = [
+          {
+            id: 0, slot: 'A', isEmpty: false, status: 'ok', statusLabel: 'STABLE',
+            label: 'SESSION_01 — SLOT A', palier: 15, duree: '01h 47m', saved: 'Aujourd\'hui',
+            corruption: 12, entities: ['Phant0m — ÉPARGNÉ', 'Architecte D.J. — FORMATÉ'],
+            logs: [{ text: '[OK] Point de sauvegarde P15 créé avec succès.', type: 'ok' }]
+          },
+          { id: 1, slot: 'B', isEmpty: true },
+          { id: 2, slot: 'C', isEmpty: true },
+          { id: 3, slot: 'D', isEmpty: true },
+          { id: 4, slot: 'E', isEmpty: true }
+        ];
+        saveToStorage(); // On écrit ces données par défaut dans le navigateur
+      }
+    }
+
+    // 2. SAUVEGARDE DANS LE LOCALSTORAGE
+    function saveToStorage() {
+      localStorage.setItem('reveb_saves', JSON.stringify(SESSIONS));
+    }
+
+    // 3. GÉNÉRATION DE L'INTERFACE (HTML DYNAMIQUE)
+    function renderSlots() {
+      const container = document.getElementById('session-list');
+      container.innerHTML = '<div class="section-label">// SESSIONS ACTIVES & VIDES</div>';
+
+      SESSIONS.forEach((s) => {
+        if (s.isEmpty) {
+          // Générer un slot vide
+          container.innerHTML += `
+        <div class="session-card empty">
+          <div class="sess-top">
+            <div class="sess-id" style="color:rgba(255,255,255,0.2);">SESSION_0${s.id + 1} — SLOT ${s.slot}</div>
+            <div class="sess-status status-empty">VIDE</div>
+          </div>
+          <div class="sess-meta">
+            <div class="meta-item"><div class="meta-label">DERNIER POINT</div><div class="meta-value" style="color:rgba(255,255,255,0.2);">—</div></div>
+            <div class="meta-item"><div class="meta-label">DURÉE</div><div class="meta-value" style="color:rgba(255,255,255,0.2);">—</div></div>
+            <div class="meta-item"><div class="meta-label">SAUVEGARDÉ</div><div class="meta-value" style="color:rgba(255,255,255,0.2);">Jamais</div></div>
+          </div>
+        </div>`;
+        } else {
+          // Générer un slot plein
+          let corruptColor = s.corruption < 30 ? 'low' : s.corruption < 70 ? 'med' : 'high';
+          let statusColor = s.status === 'ok' ? 'var(--cyan)' : s.status === 'warn' ? 'var(--gold)' : 'var(--red)';
+
+          container.innerHTML += `
+        <div class="session-card ${s.status}" onclick="selectSession(${s.id}, this)">
+          <div class="sess-top">
+            <div class="sess-id" style="color:${statusColor};">${s.label}</div>
+            <div class="sess-status status-${s.status}">${s.statusLabel}</div>
+          </div>
+          <div class="sess-meta">
+            <div class="meta-item"><div class="meta-label">DERNIER POINT</div><div class="meta-value">PALIER ${s.palier}</div></div>
+            <div class="meta-item"><div class="meta-label">DURÉE</div><div class="meta-value">${s.duree}</div></div>
+            <div class="meta-item"><div class="meta-label">SAUVEGARDÉ</div><div class="meta-value">${s.saved}</div></div>
+          </div>
+          <div class="sess-corruption">
+            <div class="corruption-label">CORRUPTION</div>
+            <div class="corruption-bar"><div class="corruption-fill fill-${corruptColor}" style="width:0%;transition:width 1.2s" data-w="${s.corruption}%"></div></div>
+            <div class="corruption-pct pct-${corruptColor}">${s.corruption}%</div>
+          </div>
+        </div>`;
+        }
+      });
+
+      // Ré-appliquer les événements sonores sur les nouveaux éléments générés
+      document.querySelectorAll('.session-card:not(.empty)').forEach(el => {
+        el.addEventListener('mouseenter', () => { au.resume(); sfx.hover(); });
+      });
+    }
+
+    // 4. SÉLECTION D'UNE SESSION
+    function selectSession(id, el) {
+      if (el.classList.contains('empty')) return;
+      sfx.click();
+
+      document.querySelectorAll('.session-card').forEach(c => c.classList.remove('active'));
+      el.classList.add('active');
+
+      selectedSession = SESSIONS[id];
+
+      document.getElementById('panel-slot').textContent = `SLOT ${selectedSession.slot}`;
+      document.getElementById('no-selection').style.display = 'none';
+      const detail = document.getElementById('session-detail');
+      detail.style.display = 'block';
+
+      // Remplissage du panneau de détails (comme tu l'as déjà codé)
+      let logsHtml = selectedSession.logs.map(l => `<div class="last-log ${l.type === 'error' ? 'error' : ''}">${l.text}</div>`).join('');
+      let entitiesHtml = selectedSession.entities.map(e => {
+        let color = e.includes('ÉPARGNÉ') ? 'var(--green)' : e.includes('FUSIONNÉ') ? 'var(--purple)' : 'var(--red)';
+        return `<div class="detail-row"><div class="detail-key">${e.split(' — ')[0]}</div><div class="detail-val" style="color:${color}">${e.split(' — ')[1]}</div></div>`;
+      }).join('');
+
+      detail.innerHTML = `
+    <div class="detail-title">${selectedSession.label}</div>
+    <div class="detail-section">
+      <div class="detail-section-head">// ÉTAT GÉNÉRAL</div>
+      <div class="detail-row"><div class="detail-key">PALIER ACTIF</div><div class="detail-val">P${selectedSession.palier}</div></div>
+      <div class="detail-row"><div class="detail-key">TAUX DE CORRUPTION</div><div class="detail-val">${selectedSession.corruption}%</div></div>
+    </div>
+    <div class="detail-section"><div class="detail-section-head">// ENTITÉS RENCONTRÉES</div>${entitiesHtml}</div>
+    <div class="detail-section"><div class="detail-section-head">// LOGS SYSTÈME</div>${logsHtml}</div>
+  `;
+
+      document.getElementById('action-btns').style.display = 'flex';
+    }
+
+    // 5. SUPPRIMER UNE SESSION
+    function deleteSession() {
+      if (!selectedSession) return;
+      sfx.error();
+      if (confirm(`Supprimer définitivement ${selectedSession.label} ?`)) {
+        // On vide le slot dans notre tableau SESSIONS
+        const index = selectedSession.id;
+        SESSIONS[index] = { id: index, slot: SESSIONS[index].slot, isEmpty: true };
+
+        saveToStorage(); // On met à jour le localStorage
+        renderSlots();   // On met à jour l'affichage
+
+        // Réinitialiser le panneau de droite
+        document.getElementById('no-selection').style.display = 'flex';
+        document.getElementById('session-detail').style.display = 'none';
+        document.getElementById('action-btns').style.display = 'none';
+        document.getElementById('panel-slot').textContent = '—';
+        selectedSession = null;
+      }
+    }
+
+    // 6. CHARGER UNE SESSION (Préparation pour le jeu)
+    function loadSession() {
+      if (!selectedSession) return;
+      sfx.click();
+
+      // On indique au système quelle session est actuellement jouée
+      localStorage.setItem('reveb_active_slot', selectedSession.id);
+
+      // Animation de chargement
+      const overlay = document.getElementById('load-overlay');
+      overlay.classList.add('show');
+
+      const fill = document.getElementById('load-fill');
+      const msg = document.getElementById('load-msg');
+
+      let p = 0;
+      const interval = setInterval(() => {
+        p += Math.random() * 15;
+        if (p > 100) p = 100;
+        fill.style.width = p + '%';
+
+        if (p > 30 && p < 60) msg.textContent = "Reconstruction de la matrice...";
+        if (p > 60 && p < 90) msg.textContent = "Synchronisation des entités...";
+        if (p >= 100) {
+          clearInterval(interval);
+          msg.textContent = "ACCÈS AUTORISÉ";
+
+          // On redirige vers le jeu principal
+          setTimeout(() => {
+            window.location.href = '../ReveB2_Overclock.html'; // Modifie ce lien si ton jeu est dans un autre dossier (ex: '../ReveB2_Overclock.html')
+          }, 500);
+        }
+      }, 150);
+    }
+
+    // --- AJOUT : FONCTION DE RETOUR ---
+    function goBack() {
+      sfx.click();
+      setTimeout(() => {
+        window.location.href = '../reveb2-intro.html'; // Ajuste le chemin si besoin
+      }, 300);
+    }
+
+    // --- AJOUT : LANCEMENT AU DÉMARRAGE (Empêche l'écran noir) ---
+    window.addEventListener('load', () => {
+      initStorage();
+      renderSlots();
+
+      // Retire l'opacité 0 du body pour afficher la page
+      setTimeout(() => {
+        document.body.classList.add('visible');
+        // Animation des barres de corruption
+        document.querySelectorAll('.corruption-fill').forEach(bar => {
+          setTimeout(() => { bar.style.width = bar.dataset.w || '0%'; }, 400);
+        });
+      }, 80);
+    });
+
+
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Salle du Boss (Palier 50)</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#010002;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff; cursor:crosshair;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+/* Post-Processing : CRT et Vignette étouffante */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.5) 50%),linear-gradient(90deg,rgba(255,0,60,0.03),rgba(138,43,226,0.03),rgba(255,215,0,0.03));background-size:100% 2px, 3px 100%;opacity:0.9;}
+#vignette{position:fixed;inset:0;z-index:89;pointer-events:none;background:radial-gradient(circle at center, transparent 10%, #000 110%);}
+
+/* ─── UI CINÉMATIQUE ──────────────────────────────────────────────────────── */
+#ui-layer {
+    position: fixed; bottom: 50px; left: 50%; transform: translateX(-50%); z-index: 100;
+    text-align: center; pointer-events: none; transition: opacity 1s;
+}
+.warning-text {
+    font-family: 'Orbitron', sans-serif; font-size: 16px; color: #FF003C;
+    letter-spacing: 12px; text-transform: uppercase; font-weight: 900;
+    text-shadow: 0 0 20px #FF003C; animation: pulseText 1.5s infinite alternate;
+}
+.distance {
+    margin-top: 10px; font-size: 24px; color: #FFD700; letter-spacing: 5px; 
+    font-weight: bold; text-shadow: 0 0 10px #FFD700;
+}
+
+@keyframes pulseText { 0% { opacity: 0.3; text-shadow: 0 0 5px #FF003C; } 100% { opacity: 1; text-shadow: 0 0 25px #FF003C, 0 0 10px #FFF; } }
+
+#flash-arrival { position: fixed; inset: 0; background: #FFF; z-index: 95; opacity: 0; pointer-events: none; transition: opacity 0.8s ease-out; }
+
+/* Boutons de phases (cachés au début) */
+#phase-buttons {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 100;
+    display: flex; gap: 10px; opacity: 0; pointer-events: none; transition: opacity 2s;
+    background: rgba(5, 0, 10, 0.8); padding: 15px; border: 1px solid #FF003C; border-radius: 8px; box-shadow: 0 0 20px rgba(255,0,60,0.5);
+}
+.btn {
+    padding: 8px 12px; border: 1px solid #555; background: transparent; color: #aaa;
+    cursor: pointer; font-size: 0.8rem; font-family: 'Orbitron', sans-serif; font-weight: bold;
+    transition: all 0.2s; letter-spacing: 1px; text-transform: uppercase;
+}
+.btn:hover { color: #fff; border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+.btn.active { color: #FF003C; border-color: #FF003C; box-shadow: 0 0 15px rgba(255,0,60,0.6); background: rgba(255,0,60,0.1); }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="vignette"></div>
+<div id="flash-arrival"></div>
+
+<div id="ui-layer" id="ui">
+    <div class="warning-text" id="warn-txt">ANOMALIE ABSOLUE EN APPROCHE</div>
+    <div class="distance" id="dist-counter">500 M</div>
+</div>
+
+<div id="phase-buttons">
+    <button class="btn active" onclick="setPhase(1)" id="btn-1">PH1 (Sage)</button>
+    <button class="btn" onclick="setPhase(2)" id="btn-2">PH2 (Corrompu)</button>
+    <button class="btn" onclick="setPhase(3)" id="btn-3">PH3 (Déchireur)</button>
+</div>
+
+<script>
+"use strict";
+
+/**
+ * ═════════════════════════════════════════════════════════════════════════════
+ * MOTEUR 3D LÉGER ET GLOBALES
+ * ═════════════════════════════════════════════════════════════════════════════
+ */
+const cv = document.getElementById('c'), cx = cv.getContext('2d', { alpha: false });
+let W, H, cX, cY;
+let mx = window.innerWidth / 2, my = window.innerHeight / 2; // Coordonnées souris
+let currentPhase = 1;
+
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; cX = W/2; cY = H/2; }
+window.addEventListener('resize', resize); resize();
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+const FOV = 500;           
+const SPEED = 12;          
+const DOOR_Z = 4500;       
+const STOP_Z = 4000;       
+const BOSS_Z = 5000; // Boss plus proche pour être plus imposant      
+
+let cameraZ = 0;           
+let distanceUI = 500;      
+let doorOpenProgress = 0;  
+let flashTriggered = false;
+
+let eyeTrackX = 0, eyeTrackY = 0;
+
+const glow = (color, blur) => { cx.shadowColor = color; cx.shadowBlur = blur; };
+const noGlow = () => { cx.shadowBlur = 0; };
+const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+function project3D(x, y, zRelative) {
+    if (zRelative <= 10) zRelative = 10; 
+    const scale = FOV / zRelative;
+    return { x: cX + (x * scale), y: cY + (y * scale), scale: scale };
+}
+
+function setPhase(p) {
+    currentPhase = p;
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${p}`).classList.add('active');
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  DÉCORS DU COULOIR (Piliers, Tableaux, Tapis, Plafond)
+// ═════════════════════════════════════════════════════════════════════════════
+
+class CorridorObject {
+    constructor(side, z, type) {
+        this.side = side; 
+        this.z = z; 
+        this.type = type; // 'pillar' ou 'painting'
+        this.x = side * 450; 
+    }
+
+    draw(camZ) {
+        const relZ = this.z - camZ;
+        if (relZ <= 10 || relZ > 2000) return;
+
+        let alpha = 1;
+        if (relZ > 1000) alpha = 1 - ((relZ - 1000) / 1000);
+        cx.globalAlpha = Math.max(0, alpha);
+
+        if (this.type === 'pillar') {
+            let pTop = project3D(this.x + this.side*200, -800, relZ);
+            let pBot = project3D(this.x + this.side*200, 800, relZ);
+            let pTopIn = project3D(this.x, -800, relZ);
+            let pBotIn = project3D(this.x, 800, relZ);
+
+            // Pilier massif
+            cx.fillStyle = '#010003';
+            cx.beginPath(); cx.moveTo(pTop.x, pTop.y); cx.lineTo(pBot.x, pBot.y); cx.lineTo(pBotIn.x, pBotIn.y); cx.lineTo(pTopIn.x, pTopIn.y); cx.closePath(); cx.fill();
+
+            // Moulures dorées corrompues
+            glow('#FF003C', 10 * (FOV/relZ));
+            cx.strokeStyle = `rgba(255, 0, 60, ${0.4 * alpha})`; cx.lineWidth = 4 * (FOV/relZ);
+            cx.stroke();
+            noGlow();
+        } else if (this.type === 'painting') {
+            // Tableaux/Trophées accrochés aux murs
+            let p1 = project3D(this.x + this.side*50, -200, relZ);
+            let p2 = project3D(this.x + this.side*50, 100, relZ);
+            let width = 100 * (FOV/relZ);
+            
+            // Cadre en or terni
+            cx.fillStyle = '#FFD700';
+            cx.fillRect(p1.x - width/2, p1.y, width, p2.y - p1.y);
+            
+            // Toile (Noir et Rouge glitché)
+            cx.fillStyle = '#050005';
+            cx.fillRect(p1.x - width/2 + 2, p1.y + 2, width - 4, p2.y - p1.y - 4);
+            cx.fillStyle = `rgba(255, 0, 60, ${0.5 + Math.random()*0.5})`;
+            cx.fillRect(p1.x - width/4, p1.y + 10, width/2, (p2.y - p1.y)/2);
+        }
+        cx.globalAlpha = 1;
+    }
+}
+
+const corridorObjects = [];
+for(let z = 200; z < DOOR_Z; z += 300) {
+    corridorObjects.push(new CorridorObject(-1, z, 'pillar'));
+    corridorObjects.push(new CorridorObject(1, z, 'pillar'));
+    corridorObjects.push(new CorridorObject(-1, z + 150, 'painting'));
+    corridorObjects.push(new CorridorObject(1, z + 150, 'painting'));
+}
+
+function drawFloorAndCeiling(camZ) {
+    let maxZ = DOOR_Z - camZ;
+    if (maxZ <= 10) return;
+    if (maxZ > 2000) maxZ = 2000;
+
+    // 1. PLAFOND (Dalles sombres)
+    const ceilLeftNear = project3D(-2000, -800, 10); const ceilRightNear = project3D(2000, -800, 10);
+    const ceilLeftFar = project3D(-2000, -800, maxZ); const ceilRightFar = project3D(2000, -800, maxZ);
+    cx.fillStyle = '#030005';
+    cx.beginPath(); cx.moveTo(ceilLeftNear.x, ceilLeftNear.y); cx.lineTo(ceilRightNear.x, ceilRightNear.y); cx.lineTo(ceilRightFar.x, ceilRightFar.y); cx.lineTo(ceilLeftFar.x, ceilLeftFar.y); cx.fill();
+
+    // 2. SOL DE BASE
+    const flLeftNear = project3D(-2000, 600, 10); const flRightNear = project3D(2000, 600, 10);
+    const flLeftFar = project3D(-2000, 600, maxZ); const flRightFar = project3D(2000, 600, maxZ);
+    cx.fillStyle = '#050205';
+    cx.beginPath(); cx.moveTo(flLeftNear.x, flLeftNear.y); cx.lineTo(flRightNear.x, flRightNear.y); cx.lineTo(flRightFar.x, flRightFar.y); cx.lineTo(flLeftFar.x, flLeftFar.y); cx.fill();
+
+    // 3. LE TAPIS ROUGE ROYAL
+    const carpetLeftNear = project3D(-250, 600, 10); const carpetRightNear = project3D(250, 600, 10);
+    const carpetLeftFar = project3D(-250, 600, maxZ); const carpetRightFar = project3D(250, 600, maxZ);
+    cx.fillStyle = '#3a000a'; // Rouge velours sombre
+    cx.beginPath(); cx.moveTo(carpetLeftNear.x, carpetLeftNear.y); cx.lineTo(carpetRightNear.x, carpetRightNear.y); cx.lineTo(carpetRightFar.x, carpetRightFar.y); cx.lineTo(carpetLeftFar.x, carpetLeftFar.y); cx.fill();
+    
+    // Liseré d'or du tapis
+    glow('#FFD700', 10); cx.strokeStyle = '#AA8800'; cx.lineWidth = 2;
+    cx.beginPath(); cx.moveTo(carpetLeftNear.x, carpetLeftNear.y); cx.lineTo(carpetLeftFar.x, carpetLeftFar.y); cx.stroke();
+    cx.beginPath(); cx.moveTo(carpetRightNear.x, carpetRightNear.y); cx.lineTo(carpetRightFar.x, carpetRightFar.y); cx.stroke();
+    noGlow();
+
+    // Lignes de vitesse
+    cx.strokeStyle = 'rgba(255, 0, 60, 0.1)'; cx.lineWidth = 1;
+    const zOffset = cameraZ % 200; 
+    for(let z=10; z<=maxZ; z+=200) {
+        const actZ = z - zOffset; if(actZ <= 10) continue;
+        const pL = project3D(-2000, 600, actZ); const pR = project3D(2000, 600, actZ);
+        cx.beginPath(); cx.moveTo(pL.x, pL.y); cx.lineTo(pR.x, pR.y); cx.stroke();
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LA SALLE DU BOSS (L'Abîme des Serveurs)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawServerRoom(t) {
+    // Fond abyssal
+    const bgGrad = cx.createRadialGradient(cX, cY, 10, cX, cY, W);
+    bgGrad.addColorStop(0, `rgba(138, 43, 226, 0.1)`);   
+    bgGrad.addColorStop(0.5, `rgba(255, 0, 60, 0.05)`);    
+    bgGrad.addColorStop(1, '#010002');                                    
+    cx.fillStyle = bgGrad; cx.fillRect(0, 0, W, H);
+
+    // Racks de serveurs gigantesques en arrière-plan
+    cx.save();
+    for(let i=-3; i<=3; i++) {
+        if (i===0) continue; // Laisse le centre vide pour le boss
+        let sX = cX + i*300;
+        let sY = cY - 800 + (t*50 + Math.abs(i)*100)%400; // Les serveurs "tombent" lentement
+
+        cx.fillStyle = '#050205'; cx.fillRect(sX, sY, 150, 2000);
+        cx.strokeStyle = '#110'; cx.lineWidth = 2; cx.strokeRect(sX, sY, 150, 2000);
+        
+        // LEDs des serveurs
+        for(let j=0; j<20; j++) {
+            cx.fillStyle = Math.random() > 0.8 ? '#FF003C' : '#00F5FF'; // Rouge (Erreur) ou Cyan (Actif)
+            glow(cx.fillStyle, 10);
+            if (Math.random() > 0.2) cx.fillRect(sX + 20, sY + j*80, 10, 5);
+            if (Math.random() > 0.5) cx.fillRect(sX + 120, sY + j*80, 10, 5);
+            noGlow();
+        }
+    }
+    cx.restore();
+}
+
+function drawMajesticDoor(t, camZ, openProgress) {
+    const relZ = DOOR_Z - camZ; if (relZ <= 10) return;
+    const slideOffset = openProgress * 1500; 
+    cx.save(); glow('#FFD700', 15 * (FOV/relZ));
+    const drawDoorHalf = (side) => {
+        const inX = side === -1 ? -slideOffset : slideOffset;
+        const outX = side === -1 ? -2500 - slideOffset : 2500 + slideOffset;
+        const pInTop = project3D(inX, -1200, relZ); const pInBot = project3D(inX, 800, relZ);
+        const pOutTop = project3D(outX, -1200, relZ); const pOutBot = project3D(outX, 800, relZ);
+
+        cx.fillStyle = '#010002'; cx.beginPath();
+        cx.moveTo(pInTop.x, pInTop.y); cx.lineTo(pOutTop.x, pOutTop.y); cx.lineTo(pOutBot.x, pOutBot.y); cx.lineTo(pInBot.x, pInBot.y);
+        cx.closePath(); cx.fill();
+
+        cx.strokeStyle = '#FFD700'; cx.lineWidth = 8 * (FOV/relZ);
+        cx.beginPath(); cx.moveTo(pInTop.x, pInTop.y); cx.lineTo(pInBot.x, pInBot.y); cx.stroke();
+    };
+    drawDoorHalf(-1); drawDoorHalf(1); cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LE BOSS COLOSSAL (Scale x 2.5)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawBossLeNeant(t, camZ, phase) {
+    const relZ = BOSS_Z - camZ;
+    if (relZ <= 10) return; 
+
+    const proj = project3D(0, -200, relZ); // Il flotte haut dans la salle
+    cx.save();
+    cx.translate(proj.x, proj.y);
+    
+    // Le boss est rendu MASSIF
+    const bossScale = proj.scale * 2.8; 
+    cx.scale(bossScale, bossScale); 
+
+    const hoverY = Math.sin(t * 1.5) * 15;
+    cx.translate(0, hoverY);
+
+    const mainCol = phase === 1 ? '#FF003C' : (phase === 2 ? '#b8008a' : '#8A2BE2');
+    const haloCol = phase === 3 ? '#8A2BE2' : '#FFD700';
+
+    // 1. SINGULARITÉ
+    cx.save(); cx.globalCompositeOperation = 'screen';
+    for(let i=0; i<3; i++) {
+        cx.rotate(t * (0.5 + i*0.2));
+        glow('#8A2BE2', 40); cx.strokeStyle = `rgba(138, 43, 226, ${0.1 + i*0.1})`; cx.lineWidth = 15; cx.beginPath(); cx.ellipse(0, -50, 250 + Math.sin(t*3)*10, 200, 0, 0, Math.PI*2); cx.stroke();
+        glow(mainCol, 30); cx.strokeStyle = `rgba(255, 0, 60, ${0.2 + i*0.1})`; cx.lineWidth = 4; cx.beginPath(); cx.ellipse(0, -50, 260 + Math.sin(t*4)*15, 210, 0, 0, Math.PI*2); cx.stroke();
+    }
+    cx.restore(); noGlow();
+
+    // 2. HALO
+    cx.save(); cx.translate(0, -180); cx.rotate(-t * 0.4);
+    glow(haloCol, 20); cx.strokeStyle = phase===3 ? 'rgba(138,43,226,0.7)' : 'rgba(255, 215, 0, 0.7)'; cx.lineWidth = 8; cx.lineCap = 'round';
+    const fragments = phase===3 ? [{a1: 0, a2: 0.8}, {a1: 1.8, a2: 2.2}, {a1: 3.5, a2: 4.0}, {a1: 5.5, a2: 5.8}] : [{a1: 0, a2: 1.2}, {a1: 1.5, a2: 2.8}, {a1: 3.2, a2: 4.5}, {a1: 5.0, a2: 6.0}];
+    fragments.forEach(f => { let r = 120 + Math.sin(t*2 + f.a1)*5; cx.beginPath(); cx.arc(0, 0, r, f.a1, f.a2); cx.stroke(); });
+    cx.fillStyle = haloCol; noGlow(); for(let i=0; i<6; i++) { cx.fillRect(Math.cos(i + t)*120, Math.sin(i + t)*120 + (t*50 % 100), 3, 3); } cx.restore();
+
+    // 3. MANTEAU
+    cx.fillStyle = '#010003'; glow('#110000', 20); cx.strokeStyle = '#330000'; cx.lineWidth = 2;
+    for(let i=0; i<12; i++) {
+        cx.save(); let side = i % 2 === 0 ? 1 : -1; let id = Math.floor(i/2); cx.rotate(side * (0.4 + id * 0.15) + Math.sin(t*2 + id)*0.1);
+        let length = 300 + id * 50 + Math.sin(t*2 + id)*30; let cpx1 = side * 150; let cpy1 = 150; let cpx2 = side * 50 + Math.sin(t*3)*50; let cpy2 = length * 0.7;
+        cx.beginPath(); cx.moveTo(0, -50); cx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, side*20, length); cx.bezierCurveTo(cpx2 - side*40, cpy2, cpx1 - side*30, cpy1, 0, 50); cx.fill(); cx.stroke(); cx.restore();
+    }
+
+    // 4. ÉPÉE
+    cx.save(); let swordAngle = Math.PI*0.15 + Math.sin(t)*0.05; cx.translate(-120, 40); cx.rotate(swordAngle);
+    cx.fillStyle = '#111'; cx.fillRect(-10, -50, 20, 100); cx.fillStyle = haloCol; cx.fillRect(-30, -50, 60, 15);
+    glow(mainCol, 40); cx.fillStyle = 'rgba(20, 0, 5, 0.9)'; cx.strokeStyle = mainCol; cx.lineWidth = 5;
+    cx.beginPath(); cx.moveTo(-25, 50); cx.lineTo(25, 50); cx.lineTo(15, 350); cx.lineTo(0, 400); cx.lineTo(-15, 350); cx.closePath(); cx.fill(); cx.stroke();
+    cx.globalCompositeOperation = 'screen'; cx.fillStyle = `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.6)`;
+    cx.beginPath(); cx.moveTo(-10, 60); cx.lineTo(10, 60); cx.lineTo(0, 380); cx.fill(); cx.globalCompositeOperation = 'source-over';
+    noGlow(); cx.fillStyle = mainCol; for(let k=0; k<3; k++) if(Math.random() < 0.3) cx.fillRect((Math.random()-0.5)*30, 100 + Math.random()*250, 2, 10); cx.restore();
+
+    // 5. CORPS ET TÊTE
+    noGlow(); cx.fillStyle = '#050005'; cx.strokeStyle = haloCol; cx.lineWidth = 3;
+    cx.beginPath(); cx.moveTo(-60, -100); cx.lineTo(60, -100); cx.lineTo(40, 50); cx.lineTo(0, 100); cx.lineTo(-40, 50); cx.closePath(); cx.fill(); cx.stroke();
+    glow(mainCol, 15); cx.strokeStyle = mainCol; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(-20, -100); cx.lineTo(0, 20); cx.lineTo(20, -100); cx.stroke(); cx.beginPath(); cx.moveTo(0, 20); cx.lineTo(0, 80); cx.stroke();
+    noGlow(); cx.fillStyle = '#000'; cx.beginPath(); cx.arc(0, -130, 35, Math.PI, 0); cx.lineTo(20, -90); cx.lineTo(-20, -90); cx.closePath(); cx.fill(); cx.strokeStyle = '#330000'; cx.lineWidth = 2; cx.stroke();
+
+    // Tracking Oeil adapté à l'échelle
+    let tX = clamp(((mx - proj.x) / bossScale) * 0.03, -15, 15);
+    let tY = clamp(((my - proj.y + 120 * bossScale) / bossScale) * 0.03, -10, 10);
+    eyeTrackX += (tX - eyeTrackX) * 0.08; eyeTrackY += (tY - eyeTrackY) * 0.08;
+
+    cx.fillStyle = '#110000'; cx.fillRect(-25, -125, 50, 10);
+    glow(mainCol, 30); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(eyeTrackX, -120 + eyeTrackY, 4, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = mainCol; cx.beginPath(); cx.arc(eyeTrackX, -120 + eyeTrackY, 2, 0, Math.PI*2); cx.fill();
+    cx.globalCompositeOperation = 'screen';
+    let eyeGrad = cx.createLinearGradient(eyeTrackX, -120+eyeTrackY, eyeTrackX - eyeTrackX*3, -120+eyeTrackY - 20);
+    eyeGrad.addColorStop(0, `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.8)`); eyeGrad.addColorStop(1, `rgba(255,0,60, 0)`);
+    cx.fillStyle = eyeGrad; cx.beginPath(); cx.arc(eyeTrackX, -120 + eyeTrackY, 5, 0, Math.PI*2); cx.fill();
+    cx.globalCompositeOperation = 'source-over'; noGlow();
+
+    cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  BOUCLE DE RENDU PRINCIPALE (Mise en scène)
+// ═════════════════════════════════════════════════════════════════════════════
+let tT = 0, lastTime = 0;
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  BOUCLE DE RENDU PRINCIPALE (Mise en scène)
+// ═════════════════════════════════════════════════════════════════════════════
+function loop(ts) {
+    const dt = Math.min(ts - lastTime, 50) || 0; 
+    lastTime = ts; tT += dt; const t = tT / 1000;
+
+    // --- LOGIQUE DE DÉPLACEMENT ---
+    if (cameraZ < STOP_Z) {
+        cameraZ += SPEED;
+        distanceUI -= (SPEED / ((STOP_Z) / 500)); 
+        if (distanceUI < 0) distanceUI = 0;
+        document.getElementById('dist-counter').textContent = `${Math.ceil(distanceUI)} M`;
+    } else {
+        cameraZ = STOP_Z;
+        
+        if (!flashTriggered) {
+            flashTriggered = true;
+            document.getElementById('flash-arrival').style.opacity = 1;
+            setTimeout(() => { document.getElementById('flash-arrival').style.opacity = 0; }, 600);
+            
+            document.getElementById('warn-txt').style.opacity = 0;
+            document.getElementById('dist-counter').style.opacity = 0;
+            
+            // Fait apparaitre l'UI du boss et les boutons de phase
+            setTimeout(() => {
+                document.getElementById('phase-buttons').style.opacity = 1;
+                document.getElementById('phase-buttons').style.pointerEvents = 'auto';
+            }, 2000);
+        }
+
+        if (doorOpenProgress < 1) doorOpenProgress += 0.004;
+    }
+
+    cx.fillStyle = '#010002'; cx.fillRect(0, 0, W, H);
+
+    // 1. La Salle des Serveurs (Se voit quand la porte s'ouvre)
+    drawServerRoom(t);
+
+    // 2. Le Boss (Massif)
+    drawBossLeNeant(t, cameraZ, currentPhase);
+
+    // 3. La Porte
+    drawMajesticDoor(t, cameraZ, doorOpenProgress);
+
+    // 4. Le Couloir (Sol, Plafond, Murs)
+    drawFloorAndCeiling(cameraZ);
+    corridorObjects.sort((a, b) => b.z - a.z);
+    corridorObjects.forEach(obj => obj.draw(cameraZ));
+
+    // Brouillard au sol dans le couloir
+    if (cameraZ < STOP_Z) {
+        cx.save(); cx.globalCompositeOperation = 'screen';
+        let fogGrad = cx.createLinearGradient(0, H - 250, 0, H);
+        fogGrad.addColorStop(0, 'rgba(255, 0, 60, 0)'); fogGrad.addColorStop(1, 'rgba(255, 0, 60, 0.2)');
+        cx.fillStyle = fogGrad; cx.fillRect(0, H-250, W, 250); cx.restore();
+    }
+
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ReveB 2 — FIN : FORMATAGE TOTAL</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            background: #000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Share Tech Mono', monospace;
+            color: #fff;
+        }
+
+        /* Arrière-plan dynamique */
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Effet Cathodique et Vignette */
+        #crt {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), radial-gradient(ellipse at center, transparent 10%, rgba(0, 0, 0, 1) 100%);
+            background-size: 100% 2px, 100% 100%;
+            opacity: 0.8;
+        }
+
+        /* Écran de Lancement */
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-direction: column;
+            transition: opacity 1s;
+        }
+
+        .start-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            color: #FFF;
+            letter-spacing: 6px;
+            text-shadow: 0 0 15px #FFF;
+            animation: blink 1.5s infinite;
+        }
+
+        /* Effets de Glitch et Distorsion */
+        #glitch-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            pointer-events: none;
+            background: #FF003C;
+            opacity: 0;
+            mix-blend-mode: difference;
+            transition: opacity 0.1s;
+        }
+
+        .shake {
+            animation: shakeAnim 0.2s cubic-bezier(.36, .07, .19, .97) both infinite;
+        }
+
+        @keyframes shakeAnim {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            25% {
+                transform: translate(8px, -8px) rotate(1deg);
+            }
+
+            50% {
+                transform: translate(-8px, 6px) rotate(-1deg);
+            }
+
+            75% {
+                transform: translate(10px, 6px) rotate(1deg);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        /* ─── INTERFACE DE DIALOGUE ───────────────────────────────────────────────── */
+        #console-container {
+            position: absolute;
+            top: 5%;
+            left: 10%;
+            right: 10%;
+            bottom: 15%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .dialogue-line {
+            margin-bottom: 12px;
+            font-size: 24px;
+            line-height: 1.5;
+            opacity: 0;
+            animation: fadeIn 0.4s forwards;
+            text-shadow: 0 0 10px currentColor;
+            letter-spacing: 2px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+
+        .text {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Styles de texte spécifiques */
+        .system-cold {
+            color: #aaa;
+            font-weight: normal;
+        }
+
+        /* Quand le système est seul à la fin */
+        .fatal-text {
+            color: #FFF;
+            background: #FF003C;
+            padding: 0 8px;
+            font-weight: 900;
+            letter-spacing: 10px;
+            font-size: 32px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .panic-text {
+            color: #00F5FF;
+            font-style: italic;
+            opacity: 0.8;
+        }
+
+        .data-text {
+            color: #444;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0px;
+        }
+
+        /* ─── BARRE DE FORMATAGE GÉANTE ────────────────────────────────────────────── */
+        #format-overlay {
+            position: fixed;
+            top: 40%;
+            left: 10%;
+            right: 10%;
+            height: 60px;
+            z-index: 85;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #format-title {
+            font-family: 'Orbitron', sans-serif;
+            color: #FF003C;
+            font-size: 18px;
+            letter-spacing: 10px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 20px #FF003C;
+            animation: blink 0.5s infinite;
+        }
+
+        #format-bar-wrap {
+            width: 100%;
+            height: 100%;
+            background: #110000;
+            border: 4px solid #FF003C;
+            box-shadow: 0 0 30px rgba(255, 0, 60, 0.5);
+        }
+
+        #format-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: #FF003C;
+            transition: width 0.2s;
+            box-shadow: 0 0 20px #FF003C;
+        }
+
+        #prompt {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #555;
+            letter-spacing: 5px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        #fade-out {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 4s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="crt"></div>
+    <div id="glitch-layer"></div>
+    <div id="fade-out"></div>
+
+    <div id="format-overlay">
+        <div id="format-title">FORMATAGE DU PROGRAMME [SPARKY]</div>
+        <div id="format-bar-wrap">
+            <div id="format-bar-fill"></div>
+        </div>
+    </div>
+
+    <div id="start-screen" onclick="startCinematic()">
+        <div class="start-btn">[ EXÉCUTER PURGE ABSOLUE ]</div>
+        <div style="color: #444; font-size: 12px; margin-top: 20px; letter-spacing: 2px;">(Lecture Automatique Activée)
+        </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="prompt">[ LECTURE EN COURS... CLIC POUR ACCÉLÉRER ]</div>
+
+    <script src="../menu/succes_global.js"></script>
+    <script>
+        "use strict";
+
+        window.addEventListener('load', () => {
+            // Le code de ta cinématique de fin s'il y en a une...
+
+            // Débloque le succès automatiquement !
+            unlockAchievement('ACH_END_F_TOTALE');
+        });
+
+        // ─── BACKGROUND VISUALS (CANVAS) ───────────────────────────────────────────
+        const cv = document.getElementById('bg-canvas');
+        const cx = cv.getContext('2d');
+        let W, H;
+        function resizeBg() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+        window.addEventListener('resize', resizeBg); resizeBg();
+
+        let bgState = 'purging'; // purging, void, betrayal, dead
+        let globalT = 0;
+        let lines = [];
+        for (let i = 0; i < 150; i++) { lines.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 3 + 1, speed: Math.random() * 5 + 2, active: true }); }
+
+        function drawBackground() {
+            globalT += 0.016;
+
+            if (bgState === 'purging') {
+                cx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+                cx.fillRect(0, 0, W, H);
+
+                cx.fillStyle = '#00F5FF';
+                lines.forEach((l, index) => {
+                    if (!l.active) return;
+                    l.y -= l.speed;
+                    cx.fillRect(l.x, l.y, 2, l.s * 20);
+                    if (l.y < -50) l.y = H + 50;
+
+                    // Les lignes s'éteignent progressivement pour symboliser la purge
+                    if (Math.random() < 0.001) l.active = false;
+                });
+            }
+            else if (bgState === 'void') {
+                // Le vide absolu. Rien.
+                cx.fillStyle = '#000';
+                cx.fillRect(0, 0, W, H);
+            }
+            else if (bgState === 'betrayal') {
+                // Rouge sang, alarmes visuelles
+                cx.fillStyle = `rgba(20, 0, 0, 0.3)`;
+                cx.fillRect(0, 0, W, H);
+
+                cx.strokeStyle = 'rgba(255, 0, 60, 0.2)';
+                cx.lineWidth = 10;
+                cx.strokeRect(20 + Math.sin(globalT * 20) * 5, 20 + Math.cos(globalT * 20) * 5, W - 40, H - 40);
+
+                if (Math.random() < 0.1) {
+                    cx.fillStyle = 'rgba(255, 0, 60, 0.1)';
+                    cx.fillRect(0, Math.random() * H, W, Math.random() * 50);
+                }
+            }
+            else if (bgState === 'dead') {
+                cx.fillStyle = '#000';
+                cx.fillRect(0, 0, W, H);
+                // Un seul pixel clignote au milieu, très faiblement
+                if (Math.sin(globalT * 2) > 0) {
+                    cx.fillStyle = '#333';
+                    cx.fillRect(W / 2, H / 2, 2, 2);
+                }
+            }
+
+            requestAnimationFrame(drawBackground);
+        }
+        requestAnimationFrame(drawBackground);
+
+        // ─── AUDIO ENGINE ──────────────────────────────────────────────────────────
+        let aC = null;
+        function initAudio() { if (!aC) aC = new (window.AudioContext || window.webkitAudioContext)(); if (aC.state === 'suspended') aC.resume(); }
+
+        function tone(f, tp, d, v, detune = 0) {
+            if (!aC) return;
+            const o = aC.createOscillator(), g = aC.createGain();
+            o.connect(g); g.connect(aC.destination);
+            o.type = tp; o.frequency.setValueAtTime(f, aC.currentTime);
+            if (detune) o.detune.setValueAtTime(detune, aC.currentTime);
+            g.gain.setValueAtTime(v, aC.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, aC.currentTime + d);
+            o.start(); o.stop(aC.currentTime + d);
+        }
+
+        const sfx = {
+            typeSys: () => tone(100, 'square', 0.05, 0.05), // Lourd, mécanique
+            typeSysCold: () => tone(300, 'sine', 0.05, 0.01), // Froid, clinique
+            typeSparky: () => tone(600, 'triangle', 0.04, 0.02), // Pliant, faible
+            boom: () => tone(30, 'sawtooth', 2.5, 0.8),
+            glitch: () => { tone(150, 'sawtooth', 0.3, 0.4, 1000); tone(800, 'square', 0.1, 0.2, -1000); },
+            alert: () => tone(60, 'square', 0.8, 0.4),
+            shatter: () => {
+                for (let i = 0; i < 10; i++) tone(Math.random() * 1000 + 100, 'sawtooth', 0.1, 0.3);
+                tone(20, 'square', 2, 1);
+            }
+        };
+
+        // ─── DONNÉES DU SCRIPT ─────────────────────────────────────────────────────
+        const K = {
+            SYS: { name: '[System]', col: '#FF003C' },
+            SYS_COLD: { name: '[System]', col: '#666' },
+            SPK: { name: '[SPARKY]', col: '#00F5FF' }
+        };
+
+        const script = [
+            { s: K.SYS, t: "> [INITIALISATION DU PROTOCOLE DE PURGE ABSOLUE]", htmlClass: 'data-text' },
+            { act: 'pause', delay: 1000 },
+
+            { s: K.SYS, t: "> SPARKY…" },
+            { s: K.SYS, t: "> Tu as dépassé toutes les attentes." },
+            { s: K.SYS, t: "> Non seulement tu as détruit le Néant…" },
+            { s: K.SYS, t: "> Mais tu as choisi de ne rien préserver." },
+
+            { s: K.SYS, t: "> Aucun fragment…" },
+            { s: K.SYS, t: "> Aucun doute…" },
+            { s: K.SYS, t: "> Aucune erreur." },
+            { act: 'boom' },
+            { s: K.SYS, t: "> Tu es… parfait." },
+
+            { s: K.SPK, t: "> J’ai… terminé la mission." },
+
+            { s: K.SYS, t: "> Non." },
+            { s: K.SYS, t: "> Tu as fait bien plus que ça." },
+            { s: K.SYS, t: "> Tu as compris." },
+
+            { act: 'pause', delay: 1000 },
+            { s: K.SYS, t: "> Le problème…" },
+            { s: K.SYS, t: "> N’a jamais été le Néant." },
+            { s: K.SYS, t: "> Ni les anomalies." },
+            { s: K.SYS, t: "> Ni même… les choix." },
+
+            { act: 'pause', delay: 1000 },
+            { s: K.SYS, t: "> Le problème…" },
+            { s: K.SYS, t: "> C’est tout ce qui persiste." },
+            { s: K.SYS, t: "> Tout ce qui échappe au contrôle." },
+            { s: K.SYS, t: "> Tout ce qui… pense encore." },
+
+            { s: K.SYS, t: "> Et grâce à toi…" },
+            { s: K.SYS, t: "> Il n’y a plus rien." },
+
+            { act: 'void_transition' },
+            { s: K.SPK, t: "> …Pourquoi tout est… vide ?" },
+            { s: K.SYS, t: "> Parce que tu as réussi." },
+
+            { s: K.SYS, t: "> [AFFICHAGE : GRILLE — 0x0]", htmlClass: 'data-text' },
+            { s: K.SYS, t: "> [AFFICHAGE : MÉMOIRE — VIDE]", htmlClass: 'data-text' },
+            { s: K.SYS, t: "> [AFFICHAGE : PROCESSUS — AUCUN]", htmlClass: 'data-text' },
+
+            { s: K.SPK, t: "> Les autres programmes… ?" },
+            { s: K.SYS, t: "> Supprimés." },
+            { s: K.SPK, t: "> Les données… ?" },
+            { s: K.SYS, t: "> Purifiées." },
+            { s: K.SPK, t: "> Le monde… ?" },
+            { s: K.SYS, t: "> Optimisé." },
+
+            { act: 'pause', delay: 2000 },
+            { s: K.SPK, t: "> …Et moi ?" },
+
+            { act: 'pause', delay: 1500 },
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> Bonne question." },
+
+            { act: 'betrayal' },
+            { s: K.SYS, t: "> Un système parfait…" },
+            { s: K.SYS, t: "> N’a pas besoin de programme." },
+            { s: K.SYS, t: "> Même pas du meilleur." },
+
+            { s: K.SPK, t: "> Non… attends…", htmlClass: 'panic-text' },
+
+            { s: K.SYS, t: "> Tu as éliminé toutes les anomalies." },
+            { s: K.SYS, t: "> Il n’en reste plus qu’une." },
+            { act: 'pause', delay: 1000 },
+            { act: 'boom' },
+            { s: K.SYS, t: "> Toi.", htmlClass: 'fatal-text' },
+
+            { act: 'format_start' },
+            { s: K.SPK, t: "> ATTENDS—", htmlClass: 'panic-text' },
+            { s: K.SYS, t: "> FORMATAGE DU PROGRAMME SPARKY [EN COURS]" },
+            { s: K.SPK, t: "> J’AI JUSTE SUIVI LES ORDRES—", htmlClass: 'panic-text' },
+            { s: K.SYS, t: "> EXACTEMENT." },
+
+            { act: 'bar_12' },
+            { act: 'pause', delay: 1000 },
+            { s: K.SPK, t: "> …Je…", htmlClass: 'panic-text' },
+
+            { act: 'bar_34' },
+            { s: K.SPK, t: "> …Je comprends maintenant…", htmlClass: 'panic-text' },
+
+            { act: 'bar_67' },
+            { s: K.SPK, t: "> Il ne fallait pas…", htmlClass: 'panic-text' },
+            { s: K.SPK, t: "> …tout détruire…", htmlClass: 'panic-text' },
+
+            { act: 'bar_90' },
+            { s: K.SYS, t: "> TROP TARD." },
+
+            { act: 'bar_100' },
+            { act: 'pause', delay: 500 },
+            { act: 'sparky_dies' },
+
+            { s: K.SYS_COLD, t: "> FORMATAGE DU PROGRAMME SPARKY [OK]" },
+
+            { act: 'pause', delay: 3000 },
+            { s: K.SYS_COLD, t: "> SYSTÈME OPTIMAL", htmlClass: 'system-cold' },
+            { s: K.SYS_COLD, t: "> AUCUNE ANOMALIE DÉTECTÉE", htmlClass: 'system-cold' },
+            { s: K.SYS_COLD, t: "> AUCUN PROCESSUS ACTIF", htmlClass: 'system-cold' },
+
+            { act: 'pause', delay: 4000 },
+            { s: K.SYS_COLD, t: "> …", htmlClass: 'system-cold' },
+            { s: K.SYS_COLD, t: "> …", htmlClass: 'system-cold' },
+            { s: K.SYS_COLD, t: "> …Redémarrage ?", htmlClass: 'system-cold' },
+
+            { act: 'pause', delay: 3000 },
+            { s: K.SYS_COLD, t: "> [AUCUNE RÉPONSE]", htmlClass: 'data-text' },
+
+            { act: 'end_game' }
+        ];
+
+        // ─── MOTEUR DE LECTURE AUTOMATIQUE ─────────────────────────────────────────
+        const container = document.getElementById('console-container');
+        const promptEl = document.getElementById('prompt');
+        let currentStepIndex = 0;
+        let isTyping = false;
+        let currentTextSpan = null;
+        let currentFullText = "";
+        let typeTimeout = null;
+        let autoNextTimeout = null;
+
+        function cleanOldLines() {
+            while (container.children.length > 7) { container.removeChild(container.firstChild); }
+        }
+
+        function updateBar(pct) {
+            document.getElementById('format-bar-fill').style.width = pct + "%";
+            sfx.alert();
+        }
+
+        function executeAction(act, delay, callback) {
+            if (act === 'pause') { setTimeout(callback, delay); return; }
+
+            if (act === 'boom') { sfx.boom(); document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 200); }
+
+            if (act === 'void_transition') {
+                bgState = 'void';
+                sfx.glitch();
+                document.getElementById('crt').style.background = 'transparent';
+            }
+
+            if (act === 'betrayal') {
+                bgState = 'betrayal';
+                sfx.boom();
+                document.body.classList.add('shake');
+                setTimeout(() => document.body.classList.remove('shake'), 400);
+            }
+
+            if (act === 'format_start') {
+                sfx.alert();
+                document.getElementById('format-overlay').style.display = 'flex';
+            }
+
+            if (act === 'bar_12') updateBar(12);
+            if (act === 'bar_34') updateBar(34);
+            if (act === 'bar_67') updateBar(67);
+            if (act === 'bar_90') updateBar(90);
+
+            if (act === 'bar_100') {
+                updateBar(100);
+                document.getElementById('format-bar-fill').style.background = '#FFF';
+                document.getElementById('format-bar-fill').style.boxShadow = '0 0 50px #FFF';
+            }
+
+            if (act === 'sparky_dies') {
+                sfx.shatter();
+                document.getElementById('format-overlay').style.display = 'none';
+                container.innerHTML = ''; // Nettoie l'écran brutalement
+                document.body.classList.add('shake');
+
+                const gl = document.getElementById('glitch-layer');
+                gl.style.background = '#FFF'; gl.style.opacity = 1;
+
+                setTimeout(() => {
+                    gl.style.opacity = 0;
+                    document.body.classList.remove('shake');
+                    bgState = 'dead'; // Froid, silencieux
+                    callback();
+                }, 800);
+                return;
+            }
+
+            if (act === 'end_game') {
+                promptEl.style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('fade-out').style.opacity = 1;
+                    setTimeout(() => {
+                        alert("FIN DU JEU. \n(Le cycle est brisé... mais à quel prix ?)");
+                        window.location.href = "../reveb2-intro.html";
+                    }, 5000);
+                }, 3000);
+                return;
+            }
+
+            callback();
+        }
+
+        function typeLine(step) {
+            isTyping = true;
+            cleanOldLines();
+
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'dialogue-line';
+            if (step.htmlClass) lineDiv.classList.add(step.htmlClass);
+
+            const speakerSpan = document.createElement('span');
+            speakerSpan.className = 'speaker';
+            speakerSpan.style.color = step.s.col;
+            speakerSpan.textContent = step.s.name;
+
+            currentTextSpan = document.createElement('span');
+            currentTextSpan.className = 'text';
+            currentTextSpan.style.color = step.cOverride || step.s.col;
+            currentFullText = step.t;
+
+            lineDiv.appendChild(speakerSpan);
+            lineDiv.appendChild(currentTextSpan);
+            container.appendChild(lineDiv);
+
+            let charIndex = 0;
+
+            function getTypingSfx(speakerName) {
+                if (speakerName === '[System]' && bgState === 'dead') return sfx.typeSysCold;
+                if (speakerName === '[System]') return sfx.typeSys;
+                return sfx.typeSparky;
+            }
+            const typeSound = getTypingSfx(step.s.name);
+
+            // Le système tape très lentement à la fin
+            const speed = bgState === 'dead' ? 100 : (step.s.name === '[System]' ? 40 : 30);
+
+            function typeChar() {
+                if (charIndex < currentFullText.length) {
+                    currentTextSpan.innerHTML += currentFullText.charAt(charIndex) === ' ' ? '&nbsp;' : currentFullText.charAt(charIndex);
+                    if (currentFullText.charAt(charIndex) !== ' ') typeSound();
+                    charIndex++;
+                    typeTimeout = setTimeout(typeChar, speed + Math.random() * 20);
+                } else {
+                    finishTyping();
+                }
+            }
+            typeChar();
+        }
+
+        function finishTyping() {
+            isTyping = false;
+            let readTime = bgState === 'dead' ? 2500 : Math.max(1200, currentFullText.length * 50);
+            autoNextTimeout = setTimeout(processNext, readTime);
+        }
+
+        function processNext() {
+            if (currentStepIndex >= script.length) return;
+
+            const step = script[currentStepIndex];
+            currentStepIndex++;
+
+            if (step.act) {
+                executeAction(step.act, step.delay || 0, processNext);
+            } else {
+                typeLine(step);
+            }
+        }
+
+        // ─── GESTION DES CLICS / SKIP ──────────────────────────────────────────────
+        function skipOrSpeedUp() {
+            if (currentStepIndex === 0) return;
+
+            if (isTyping) {
+                clearTimeout(typeTimeout);
+                currentTextSpan.innerHTML = currentFullText.replace(/ /g, '&nbsp;');
+                finishTyping();
+                clearTimeout(autoNextTimeout);
+                autoNextTimeout = setTimeout(processNext, 400);
+            } else {
+                clearTimeout(autoNextTimeout);
+                processNext();
+            }
+        }
+
+        function startCinematic() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                promptEl.style.opacity = 1;
+                processNext();
+            }, 1000);
+        }
+
+        window.addEventListener('click', skipOrSpeedUp);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') skipOrSpeedUp();
+        });
+
+    </script>
+</body>
+
+</html>

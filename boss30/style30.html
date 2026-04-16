@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Visualiseur de Boss</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bangers&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#020005;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+/* Effets Post-Processing CSS (Scanlines, Vignette) pour le style ReveB 2 */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.25) 50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06));background-size:100% 2px, 3px 100%;opacity:0.6;}
+#vignette{position:fixed;inset:0;z-index:89;pointer-events:none;background:radial-gradient(circle at center, transparent 40%, #000 120%);}
+
+/* ─── INTERFACE DE CONTRÔLE ───────────────────────────────────────────────── */
+#ui-panel {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 15px;
+    background: rgba(10, 0, 20, 0.85);
+    padding: 15px 30px;
+    border: 2px solid #8A2BE2;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(138,43,226,0.4);
+    backdrop-filter: blur(5px);
+}
+
+.btn {
+    padding: 10px 15px;
+    border: 2px solid #555;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 1rem;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: bold;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+}
+
+.btn:hover {
+    color: #fff;
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.btn.active {
+    color: #00F5FF;
+    border-color: #00F5FF;
+    box-shadow: 0 0 15px rgba(0,245,255,0.6);
+    background: rgba(0,245,255,0.1);
+}
+
+/* ─── INFOS DEBUG ─────────────────────────────────────────────────────────── */
+#debug-info {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 100;
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="vignette"></div>
+
+<div id="ui-panel">
+    <button class="btn active" id="btn-1" onclick="setPhase(1)">PHASE 1 (DJ)</button>
+    <button class="btn" id="btn-2" onclick="setPhase(2)">PHASE 2 (DANSE)</button>
+    <button class="btn" id="btn-3" onclick="setPhase(3)">PHASE 3 (MUTANT)</button>
+    <button class="btn" id="btn-4" onclick="setPhase(4)">PHASE 4 (SERVEUR)</button>
+</div>
+
+<div id="debug-info">
+    <div id="fps-counter">FPS: 0</div>
+    <div id="time-counter">Temps: 0s</div>
+</div>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURATION DU CANVAS & OUTILS VISUELS
+// ═══════════════════════════════════════════════════════════
+const cv = document.getElementById('c'), cx = cv.getContext('2d', {alpha: false});
+let W, H;
+let currentPhase = 1;
+
+const K = {
+    pur: '#8A2BE2', wh: '#ffffff', bk: '#000000', gold: '#FFD700', red: '#FF003C', blue: '#00F5FF', drk: '#050011'
+};
+
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+window.addEventListener('resize', resize); resize();
+
+function setPhase(phase) {
+    currentPhase = phase;
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${phase}`).classList.add('active');
+    tT = 0; 
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BOUCLE DE RENDU PRINCIPALE
+// ═══════════════════════════════════════════════════════════
+let tT = 0, lastT = 0, frames = 0, lastFpsT = 0;
+
+function draw(ts) {
+    const dt = Math.min(ts - lastT, 50) || 0; 
+    lastT = ts; tT += dt;
+    const t = tT / 1000;
+
+    frames++;
+    if (ts - lastFpsT >= 1000) { document.getElementById('fps-counter').innerText = `FPS: ${frames}`; frames = 0; lastFpsT = ts; }
+    document.getElementById('time-counter').innerText = `Temps: ${(t).toFixed(1)}s`;
+
+    cx.fillStyle = K.drk; cx.fillRect(0, 0, W, H);
+    drawHelperGrid();
+
+    const centerX = W / 2, centerY = H / 2;
+
+    // ═══════════════════════════════════════════════════════════
+    //  PHASE 1 : L'ARCHITECTE D.J. (ÉDITEUR)
+    // ═══════════════════════════════════════════════════════════
+    if (currentPhase === 1) {
+        const beatPulse = Math.pow(Math.sin(t * Math.PI * 1.5), 2);
+        
+        // FOND
+        cx.save();
+        const bgGrad = cx.createRadialGradient(centerX, centerY, 10, centerX, centerY, W);
+        bgGrad.addColorStop(0, '#1a0033'); bgGrad.addColorStop(0.6, '#050011'); bgGrad.addColorStop(1, '#000000');
+        cx.fillStyle = bgGrad; cx.fillRect(0, 0, W, H);
+
+        cx.lineWidth = 2; cx.strokeStyle = `rgba(138, 43, 226, ${0.1 + beatPulse * 0.2})`;
+        cx.save(); cx.translate(centerX, centerY + 50);
+        for(let i=0; i<20; i++) { let z=((i*30)-(tT/10))%600; if(z<0)z+=600; let y=(z/600)*400; cx.beginPath(); cx.moveTo(-W, y); cx.lineTo(W, y); cx.stroke(); }
+        for(let i=-W; i<W; i+=80) { cx.beginPath(); cx.moveTo(i*0.1, 0); cx.lineTo(i, 400); cx.stroke(); }
+        cx.restore();
+
+        cx.fillStyle = `rgba(0, 245, 255, 0.15)`;
+        const eqBars = 30, eqWidth = W / eqBars;
+        for(let i=0; i<eqBars; i++) { let h=50+Math.abs(Math.sin(t*5+i*2))*150+(Math.random()*50*beatPulse); cx.fillRect(i*eqWidth+5, H-h, eqWidth-10, h); }
+
+        // BOSS D.J.
+        const bounce = Math.abs(Math.sin(t * Math.PI * 3)) * 15;
+        const sway = Math.cos(t * 2) * 20;
+        cx.translate(centerX + sway, centerY - 60 + bounce);
+
+        // Bras
+        const drawArm = (side) => {
+            cx.save(); const dir = side==='left'?-1:1;
+            const shX=dir*60, shY=-50, elX=dir*140+Math.cos(t*3)*20, elY=-20+Math.sin(t*4)*30, hdX=dir*90+Math.cos(t*15)*5, hdY=70+bounce;
+            glow(side==='left'?K.blue:K.red, 15); cx.strokeStyle = side==='left'?K.blue:K.red; cx.lineWidth=4;
+            cx.beginPath(); cx.moveTo(shX, shY); cx.lineTo(elX, elY); cx.lineTo(hdX, hdY); cx.stroke();
+            noGlow(); cx.strokeStyle='#333'; cx.lineWidth=18; cx.beginPath(); cx.moveTo(shX, shY); cx.lineTo(elX, elY); cx.lineTo(hdX, hdY); cx.stroke();
+            cx.strokeStyle=K.pur; cx.lineWidth=2; cx.setLineDash([10,10]); cx.lineDashOffset=tT/20*dir;
+            cx.beginPath(); cx.moveTo(shX, shY); cx.lineTo(elX, elY); cx.lineTo(hdX, hdY); cx.stroke(); cx.setLineDash([]);
+            cx.translate(hdX, hdY); cx.rotate(Math.sin(t*2)*0.5+(side==='left'?Math.PI/4:-Math.PI/4));
+            glow(K.wh, 10); cx.fillStyle='#222'; cx.strokeStyle=side==='left'?K.blue:K.red; cx.lineWidth=2;
+            cx.fillRect(-15, -10, 30, 20); cx.strokeRect(-15, -10, 30, 20);
+            cx.fillRect(-12, 10, 6, 15); cx.strokeRect(-12, 10, 6, 15); cx.fillRect(6, 10, 6, 15); cx.strokeRect(6, 10, 6, 15);
+            cx.restore();
+        };
+        drawArm('left'); drawArm('right');
+
+        // Platines & Console
+        cx.save(); cx.translate(0, 40); 
+        glow('#000', 30); cx.fillStyle='#0a0514'; cx.beginPath(); cx.moveTo(-120, 0); cx.lineTo(120, 0); cx.lineTo(160, 60); cx.lineTo(-160, 60); cx.closePath(); cx.fill(); cx.strokeStyle=K.pur; cx.lineWidth=3; cx.stroke();
+        noGlow(); cx.fillStyle=`rgba(0, 245, 255, 0.2)`; for(let i=-100; i<100; i+=20) cx.fillRect(i, 10, 10, 40);
+        const drawTurntable = (xOff, color) => {
+            cx.save(); cx.translate(xOff, 30); cx.scale(1, 0.4); cx.rotate(t*10*(xOff<0?1:-1)); 
+            glow(color, 20); cx.fillStyle='#111'; cx.beginPath(); cx.arc(0, 0, 50, 0, Math.PI*2); cx.fill();
+            cx.fillStyle=color; for(let i=0; i<12; i++) { cx.rotate((Math.PI*2)/12); cx.beginPath(); cx.moveTo(40,-5); cx.lineTo(55,0); cx.lineTo(40,5); cx.fill(); }
+            cx.fillStyle='#fff'; cx.beginPath(); cx.arc(0, 0, 15, 0, Math.PI*2); cx.fill(); cx.strokeStyle=color; cx.lineWidth=5; cx.beginPath(); cx.arc(0, 0, 25, 0, Math.PI*2); cx.stroke(); cx.restore();
+        };
+        drawTurntable(-90, K.blue); drawTurntable(90, K.red);
+        cx.fillStyle='#222'; cx.fillRect(-40, 45, 80, 5); glow(K.wh, 10); cx.fillStyle='#fff'; cx.fillRect(Math.sin(t*4)*30-5, 40, 10, 15); noGlow();
+        
+        // Curseurs Flottants
+        const drawEditorCursor = (baseX, baseY, color, timeOff, radius, speed) => {
+            cx.save(); const curX=baseX+Math.cos(t*speed+timeOff)*radius*1.5, curY=baseY-60+Math.sin(t*speed*1.3+timeOff)*radius;
+            cx.beginPath(); cx.moveTo(baseX, baseY); cx.bezierCurveTo(baseX, curY+50, curX, baseY-50, curX, curY);
+            cx.strokeStyle=color; cx.lineWidth=1.5; cx.globalAlpha=0.4+Math.sin(t*10+timeOff)*0.2; cx.stroke();
+            cx.setLineDash([5, 15]); cx.lineDashOffset=-tT/15*Math.sign(speed); cx.strokeStyle='#fff'; cx.lineWidth=2; cx.globalAlpha=0.8; cx.stroke(); cx.setLineDash([]); cx.globalAlpha=1;
+            cx.translate(curX, curY); cx.rotate(-Math.PI/6+Math.sin(t*3+timeOff)*0.2);
+            glow(color, 20); cx.fillStyle=color; cx.strokeStyle='#fff'; cx.lineWidth=2;
+            cx.beginPath(); cx.moveTo(0,0); cx.lineTo(15,35); cx.lineTo(0,25); cx.lineTo(-15,35); cx.closePath(); cx.fill(); cx.stroke();
+            if (Math.sin(t*5+timeOff)>0.8) { cx.globalCompositeOperation='screen'; cx.strokeStyle=color; cx.lineWidth=1; cx.setLineDash([4,4]); cx.strokeRect(-20,40,60,40); cx.setLineDash([]); cx.globalCompositeOperation='source-over'; }
+            cx.restore();
+        };
+        drawEditorCursor(-90, 30, K.blue, 0, 110, 1.2); drawEditorCursor(-90, 30, '#00AAFF', Math.PI, 140, -1.4);
+        drawEditorCursor(90, 30, K.red, 1.5, 110, 1.3); drawEditorCursor(90, 30, '#FF0088', Math.PI+1.5, 150, -1.1);
+        cx.restore();
+
+        // Tête CRT
+        cx.save(); cx.translate(0, -60);
+        glow(K.pur, 20); cx.strokeStyle=K.pur; cx.lineWidth=8; cx.beginPath(); cx.arc(0, -10, 65, Math.PI, 0); cx.stroke(); 
+        const earSize=25+beatPulse*10; cx.fillStyle='#050011'; cx.beginPath(); cx.ellipse(-65, -5, 10, earSize, 0, 0, Math.PI*2); cx.fill(); cx.stroke(); cx.beginPath(); cx.ellipse(65, -5, 10, earSize, 0, 0, Math.PI*2); cx.fill(); cx.stroke();
+        cx.fillStyle=K.blue; cx.beginPath(); cx.ellipse(-65, -5, 4, earSize*0.6, 0, 0, Math.PI*2); cx.fill(); cx.fillStyle=K.red; cx.beginPath(); cx.ellipse(65, -5, 4, earSize*0.6, 0, 0, Math.PI*2); cx.fill();
+        noGlow(); cx.fillStyle='#0a001a'; cx.beginPath(); cx.roundRect(-50, -45, 100, 90, 10); cx.fill(); cx.strokeStyle='#eebbff'; cx.lineWidth=3; cx.stroke();
+        
+        glow(K.blue, 15); cx.fillStyle=K.blue;
+        if(Math.random()>0.05){ cx.beginPath(); cx.moveTo(-25,-20); cx.lineTo(-10,-10); cx.lineTo(-25,-15); cx.fill(); cx.beginPath(); cx.moveTo(25,-20); cx.lineTo(10,-10); cx.lineTo(25,-15); cx.fill(); cx.fillStyle='#fff'; cx.beginPath(); cx.arc(-18,-15,4,0,Math.PI*2); cx.fill(); cx.beginPath(); cx.arc(18,-15,4,0,Math.PI*2); cx.fill(); }
+        else{ cx.fillRect(-30,-16,20,3); cx.fillRect(10,-16,20,3); }
+        
+        glow(K.red, 15); cx.fillStyle=K.red; const mw=60, bars=7, bw=mw/bars;
+        for(let i=0; i<bars; i++){ let bh=5+Math.random()*15*beatPulse+(i===3?10:0); cx.fillRect(-mw/2+i*bw+2, 15-bh/2, bw-4, bh); }
+        noGlow(); cx.globalAlpha=0.15; cx.fillStyle='#fff'; cx.beginPath(); cx.moveTo(-45,-40); cx.lineTo(10,-40); cx.lineTo(-45,30); cx.fill(); cx.globalAlpha=1;
+        cx.restore(); cx.restore();
+    } 
+
+    else if (currentPhase === 2) {
+        const beatPulse = Math.pow(Math.sin(t * Math.PI * 2), 4); // BPM très rapide
+        
+        // ── A. FOND : CLUB DISCO / DDR ──
+        cx.fillStyle = '#0b001a'; cx.fillRect(0,0,W,H);
+        
+        // Damier Dancefloor lumineux
+        cx.save();
+        cx.translate(centerX, centerY + 80);
+        cx.scale(1, 0.35); // Perspective aplatie
+        cx.rotate(t * 0.2); // Le sol tourne lentement
+        const gridSize = 80;
+        for(let x = -600; x < 600; x += gridSize) {
+            for(let y = -600; y < 600; y += gridSize) {
+                // Clignotement aléatoire sur le beat
+                const isLit = Math.random() < (0.1 + beatPulse*0.3);
+                if(isLit) {
+                    cx.fillStyle = (Math.random() > 0.5) ? 'rgba(0, 245, 255, 0.4)' : 'rgba(255, 0, 60, 0.4)';
+                    cx.fillRect(x, y, gridSize-2, gridSize-2);
+                }
+                cx.strokeStyle = 'rgba(138,43,226,0.3)';
+                cx.strokeRect(x, y, gridSize, gridSize);
+            }
+        }
+        cx.restore();
+
+        // Projecteurs croisés (Spotlights)
+        cx.globalCompositeOperation = 'screen';
+        const drawSpotlight = (x, angle, color) => {
+            cx.save();
+            cx.translate(x, H); cx.rotate(angle + Math.sin(t*3)*0.3);
+            const grad = cx.createLinearGradient(0, 0, 0, -H*1.5);
+            grad.addColorStop(0, color); grad.addColorStop(1, 'rgba(0,0,0,0)');
+            cx.fillStyle = grad; cx.beginPath(); cx.moveTo(-20, 0); cx.lineTo(-200, -H*1.5); cx.lineTo(200, -H*1.5); cx.lineTo(20, 0); cx.fill();
+            cx.restore();
+        }
+        drawSpotlight(W*0.2, 0.4, 'rgba(0, 245, 255, 0.3)');
+        drawSpotlight(W*0.8, -0.4, 'rgba(255, 0, 60, 0.3)');
+        cx.globalCompositeOperation = 'source-over';
+
+        // ── B. INTERFACE DE RYTHME (4 Colonnes DDR & Notes de Musique) ──
+        const drawRhythmColumn = (x, dirIndex, colorHex, patternOffset) => {
+            cx.save(); cx.translate(x, 0);
+            const colW = 64;
+            
+            // Fond de la colonne
+            cx.fillStyle = 'rgba(255,255,255,0.05)'; cx.fillRect(-colW/2, 0, colW, H);
+            cx.strokeStyle = colorHex; cx.lineWidth = 1; cx.globalAlpha = 0.5;
+            cx.beginPath(); cx.moveTo(-colW/2, 0); cx.lineTo(-colW/2, H); cx.moveTo(colW/2, 0); cx.lineTo(colW/2, H); cx.stroke();
+            cx.globalAlpha = 1;
+            
+            // Rythme / Partition : les flèches tombent
+            for(let i=0; i<8; i++) {
+                // Création d'une partition avec offset pour faire une mélodie visuelle
+                let arrowY = ((i * 180) + tT * 0.45 + patternOffset) % (H + 120) - 60;
+                let isHit = Math.abs(arrowY - (H - 100)) < 25; // Zone de validation ("Perfect")
+                
+                cx.save(); cx.translate(0, arrowY);
+                // Orientation : 0=Gauche, 1=Bas, 2=Haut, 3=Droite
+                const angles = [Math.PI, -Math.PI/2, Math.PI/2, 0];
+                cx.rotate(angles[dirIndex]);
+                
+                glow(isHit ? '#fff' : colorHex, isHit ? 20 : 10);
+                cx.fillStyle = isHit ? '#fff' : colorHex;
+                cx.globalAlpha = isHit ? 1 : 0.6;
+                cx.strokeStyle = '#fff'; cx.lineWidth = 2;
+                
+                // Dessin de la flèche de danse
+                cx.beginPath(); cx.moveTo(0, -20); cx.lineTo(25, 10); cx.lineTo(10, 10); cx.lineTo(10, 25); cx.lineTo(-10, 25); cx.lineTo(-10, 10); cx.lineTo(-25, 10); cx.closePath();
+                cx.fill(); cx.stroke(); 
+                
+                // Si la flèche touche le tempo, elle joue une note de musique !
+                if (isHit) {
+                    cx.rotate(-angles[dirIndex]); // Remettre le texte droit
+                    cx.fillStyle = colorHex;
+                    cx.font = 'bold 30px Arial';
+                    // La note flotte vers le haut
+                    cx.fillText(['♪', '♫', '♬'][i%3], 25, -20 - (arrowY - (H-100)));
+                }
+                noGlow(); cx.restore();
+            }
+            
+            // Zone de frappe (Cible en bas)
+            glow(colorHex, 15); cx.strokeStyle = '#fff'; cx.lineWidth = 4;
+            cx.strokeRect(-colW/2 + 5, H - 130, colW - 10, 60); noGlow();
+            cx.restore();
+        };
+
+        // Positions des 4 colonnes (2 de chaque côté) avec leurs décalages de tempo (patternOffset)
+        drawRhythmColumn(W * 0.10, 0, K.blue, 0);       // Gauche
+        drawRhythmColumn(W * 0.18, 1, '#00FF41', 120);  // Bas
+        drawRhythmColumn(W * 0.82, 2, K.gold, 60);      // Haut
+        drawRhythmColumn(W * 0.90, 3, K.red, 180);      // Droite
+
+        // ── C. LE BOSS QUI DANSE (Robot Dance + Tête DJ Phase 1) ──
+        cx.save();
+        
+        // Mouvement saccadé pour la danse : quantifié pour faire des "clics"
+        const danceTick = Math.floor(t * 6); 
+        const swayX = (danceTick % 2 === 0 ? 1 : -1) * 20; 
+        const dipY = (danceTick % 4 === 0 ? 25 : 0); 
+        
+        cx.translate(centerX + swayX, centerY + dipY);
+
+        // Halo d'énergie derrière lui
+        glow(K.pur, 50); cx.fillStyle = `rgba(138,43,226,${0.2 + beatPulse*0.2})`; cx.beginPath(); cx.arc(0, 0, 150, 0, Math.PI*2); cx.fill(); noGlow();
+
+        // 1. Le Torse (Veste futuriste lumineuse)
+        cx.fillStyle = '#111'; cx.strokeStyle = K.pur; cx.lineWidth = 4;
+        cx.beginPath(); cx.moveTo(-40, -30); cx.lineTo(40, -30); cx.lineTo(20, 80); cx.lineTo(-20, 80); cx.closePath(); cx.fill(); cx.stroke();
+        // Égaliseur sur le torse
+        cx.fillStyle = K.blue; cx.fillRect(-15, 0, 8, 40 * Math.random()); cx.fillStyle = K.red; cx.fillRect(5, 0, 8, 40 * Math.random());
+
+        // 2. Les Bras (Mouvements de "Locking" très secs)
+        const drawDancingArm = (side, tick) => {
+            cx.save();
+            const dir = side === 'left' ? -1 : 1;
+            // Angles qui changent brusquement
+            const angle1 = (tick % 3) * (Math.PI / 4) * dir;
+            const angle2 = ((tick + 1) % 4) * (Math.PI / 2) * dir;
+            
+            cx.translate(dir * 50, -20); // Épaule
+            
+            // Haut du bras
+            cx.rotate(angle1);
+            cx.fillStyle = '#222'; cx.strokeStyle = side === 'left' ? K.blue : K.red; cx.lineWidth = 4;
+            cx.fillRect(-10, 0, 20, 60); cx.strokeRect(-10, 0, 20, 60);
+            
+            // Coude
+            cx.translate(0, 60); cx.rotate(angle2);
+            cx.fillRect(-8, 0, 16, 50); cx.strokeRect(-8, 0, 16, 50);
+            
+            // Main (Gant lumineux)
+            glow('#fff', 15); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, 55, 12, 0, Math.PI*2); cx.fill(); noGlow();
+            cx.restore();
+        };
+        drawDancingArm('left', danceTick);
+        drawDancingArm('right', danceTick + 2); // Asynchrone
+
+        // 3. La Tête (TV de la Phase 1)
+        cx.save();
+        // La tête dodeline d'avant en arrière
+        cx.translate(0, -60 + (danceTick % 2 === 0 ? 5 : -5));
+        
+        // Le casque audio holographique
+        glow(K.pur, 20);
+        cx.strokeStyle = K.pur; cx.lineWidth = 8;
+        cx.beginPath(); cx.arc(0, -10, 65, Math.PI, 0); cx.stroke(); // Arceau
+        
+        const earSize = 25 + beatPulse * 10;
+        cx.fillStyle = '#050011';
+        cx.beginPath(); cx.ellipse(-65, -5, 10, earSize, 0, 0, Math.PI*2); cx.fill(); cx.stroke();
+        cx.beginPath(); cx.ellipse(65, -5, 10, earSize, 0, 0, Math.PI*2); cx.fill(); cx.stroke();
+        cx.fillStyle = K.blue; cx.beginPath(); cx.ellipse(-65, -5, 4, earSize*0.6, 0, 0, Math.PI*2); cx.fill();
+        cx.fillStyle = K.red;  cx.beginPath(); cx.ellipse(65, -5, 4, earSize*0.6, 0, 0, Math.PI*2); cx.fill();
+
+        noGlow();
+        cx.fillStyle = '#0a001a';
+        cx.beginPath(); cx.roundRect(-50, -45, 100, 90, 10); cx.fill();
+        cx.strokeStyle = '#eebbff'; cx.lineWidth = 3; cx.stroke();
+
+        // Le Visage Écran
+        glow(K.blue, 15);
+        cx.fillStyle = K.blue;
+        
+        if (Math.random() > 0.05) {
+            cx.beginPath(); cx.moveTo(-25, -20); cx.lineTo(-10, -10); cx.lineTo(-25, -15); cx.fill();
+            cx.beginPath(); cx.moveTo(25, -20); cx.lineTo(10, -10); cx.lineTo(25, -15); cx.fill();
+            cx.fillStyle = '#fff';
+            cx.beginPath(); cx.arc(-18, -15, 4, 0, Math.PI*2); cx.fill();
+            cx.beginPath(); cx.arc(18, -15, 4, 0, Math.PI*2); cx.fill();
+        } else {
+            cx.fillRect(-30, -16, 20, 3); cx.fillRect(10, -16, 20, 3);
+        }
+
+        glow(K.red, 15);
+        cx.fillStyle = K.red;
+        const mouthWidth = 60, bars = 7, barW = mouthWidth / bars;
+        for(let i=0; i<bars; i++) {
+            let barH = 5 + Math.random() * 15 * beatPulse + (i === 3 ? 10 : 0); 
+            cx.fillRect(-mouthWidth/2 + i*barW + 2, 15 - barH/2, barW - 4, barH);
+        }
+
+        noGlow();
+        cx.globalAlpha = 0.15; cx.fillStyle = '#fff';
+        cx.beginPath(); cx.moveTo(-45, -40); cx.lineTo(10, -40); cx.lineTo(-45, 30); cx.fill();
+        cx.globalAlpha = 1;
+
+        cx.restore(); // Fin Tête
+        cx.restore(); // Fin Boss
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PHASE 3 : FUSION DES PIÈGES (ANCIENNEMENT PHASE 2)
+    // ═══════════════════════════════════════════════════════════
+
+    else if (currentPhase === 3) {
+        const t = tT / 1000; const pulse = Math.pow(Math.sin(t * 3), 2);
+        
+        cx.save();
+        const alarmPulse = Math.pow(Math.sin(t * Math.PI), 2); 
+        const bgGrad = cx.createRadialGradient(centerX, centerY, 10, centerX, centerY, W);
+        bgGrad.addColorStop(0, `rgba(5, 0, 10, 1)`); bgGrad.addColorStop(0.5, `rgba(20, 0, 5, 1)`); bgGrad.addColorStop(1, `rgba(60, 0, 10, ${0.2 + alarmPulse * 0.4})`);
+        cx.fillStyle = bgGrad; cx.fillRect(0, 0, W, H);
+
+        cx.lineWidth = 2;
+        for(let i=0; i<10; i++) { let z=((i*100)-(tT/3))%1000; if(z<0)z+=1000; const scale=Math.pow(z/1000, 2.5), alpha=1-(z/1000); const rw=W*scale*1.5, rh=H*scale*1.5; cx.strokeStyle=`rgba(255, 0, 60, ${alpha * 0.6})`; glow(K.red, 15 * scale); cx.strokeRect(centerX - rw/2, centerY - rh/2, rw, rh); noGlow(); }
+
+        cx.globalCompositeOperation = "screen"; const chevronOffset = (tT / 2) % 200; cx.fillStyle = `rgba(255, 0, 60, ${0.03 + alarmPulse * 0.04})`;
+        for(let y=-200; y<H+200; y+=200) { let cy=y+chevronOffset; cx.beginPath(); cx.moveTo(0, cy); cx.lineTo(120, cy+100); cx.lineTo(0, cy+200); cx.fill(); cx.beginPath(); cx.moveTo(W, cy); cx.lineTo(W-120, cy+100); cx.lineTo(W, cy+200); cx.fill(); }
+        
+        cx.globalCompositeOperation = "source-over";
+        for(let i=0; i<150; i++) { let px=(Math.sin(i*34.5)*0.5+0.5)*W; let py=(H-((i*87.2+tT*0.35)%H)); let size=(i%3)+1; cx.globalAlpha=(Math.sin(t*5+i)*0.5+0.5)*0.8; if(i%15===0&&Math.sin(t*10+i)>0.8){ cx.fillStyle=K.wh; glow(K.wh,5); } else{ cx.fillStyle=K.red; noGlow(); } cx.fillRect(px, py, size, size*(1+(i%3))); }
+        cx.restore(); cx.globalAlpha=1; noGlow();
+
+        // ── BOSS MUTANT ──
+        const glitchX = (Math.random()-0.5)*4, glitchY = (Math.random()-0.5)*4, bounce = Math.abs(Math.sin(t*Math.PI*4))*10;
+        cx.save(); cx.translate(centerX+glitchX, centerY-30+bounce+glitchY);
+
+        glow(K.pur, 40);
+        for(let i=0; i<3; i++) { cx.save(); cx.rotate(t*5+i); cx.strokeStyle=`rgba(138,43,226,${0.8-i*0.2})`; cx.lineWidth=4; cx.beginPath(); cx.ellipse(0,0,80+i*20,30+i*10,0,0,Math.PI*2); cx.stroke(); cx.restore(); }
+        cx.fillStyle='#05000a'; cx.beginPath(); cx.arc(0,0,45,0,Math.PI*2); cx.fill(); cx.strokeStyle=K.wh; cx.lineWidth=2; cx.stroke(); noGlow();
+
+        cx.save(); cx.strokeStyle=K.pur; cx.lineWidth=2; cx.fillStyle='rgba(10,0,20,0.5)';
+        for(let i=0; i<5; i++) { cx.save(); const a=t+i*(Math.PI*2/5); const dist=120+Math.sin(t*3+i)*20; cx.translate(Math.cos(a)*dist, Math.sin(a)*dist+40); cx.rotate(t*2+i); cx.beginPath(); cx.moveTo(-15,-15); cx.lineTo(20,-5); cx.lineTo(10,20); cx.closePath(); cx.fill(); cx.stroke(); cx.restore(); }
+        cx.restore();
+
+        const drawMutantArm = (side) => {
+            cx.save(); const dir=side==='left'?-1:1;
+            const shX=dir*60, shY=-20, elX=dir*160+Math.cos(t*8)*10, elY=20+Math.sin(t*6)*20, hdX=dir*120+Math.cos(t*4)*30, hdY=100+bounce;
+            glow(K.red, 15); cx.strokeStyle=`rgba(255,0,60,${0.5+Math.random()*0.5})`; cx.lineWidth=6; cx.beginPath(); cx.moveTo(shX, shY); cx.lineTo(elX, elY); cx.lineTo(hdX, hdY); cx.stroke(); noGlow();
+            cx.strokeStyle='#220000'; cx.lineWidth=22; cx.lineJoin='round'; cx.beginPath(); cx.moveTo(shX, shY); cx.lineTo(elX, elY); cx.lineTo(hdX, hdY); cx.stroke();
+            cx.strokeStyle=K.red; cx.lineWidth=3; cx.setLineDash([12, 12]); cx.lineDashOffset=-tT/10*dir; cx.beginPath(); cx.moveTo(shX, shY); cx.lineTo(elX, elY); cx.lineTo(hdX, hdY); cx.stroke(); cx.setLineDash([]);
+            cx.translate(hdX, hdY); cx.scale(1, 0.6); cx.rotate(t*20*dir); glow(K.wh, 20); cx.fillStyle='#111'; cx.beginPath(); cx.arc(0,0,45,0,Math.PI*2); cx.fill(); cx.fillStyle=K.red;
+            for(let i=0; i<12; i++) { cx.rotate((Math.PI*2)/12); cx.beginPath(); cx.moveTo(35,-6); cx.lineTo(55,0); cx.lineTo(35,6); cx.fill(); }
+            cx.fillStyle='#fff'; cx.beginPath(); cx.arc(0,0,15,0,Math.PI*2); cx.fill(); cx.restore();
+        };
+        drawMutantArm('left'); drawMutantArm('right');
+
+        cx.save(); cx.translate(-70, -50); cx.fillStyle='#110000'; cx.fillRect(-15,-15,30,30); cx.strokeStyle=K.red; cx.lineWidth=2; cx.strokeRect(-15,-15,30,30);
+        const aimAngle=Math.PI/4+Math.sin(t*3)*(Math.PI/4); cx.rotate(aimAngle); glow(K.red, 15); cx.fillStyle='#fff'; cx.beginPath(); cx.arc(10,0,8,0,Math.PI*2); cx.fill();
+        cx.globalCompositeOperation='screen'; cx.strokeStyle=`rgba(255,0,60,0.4)`; cx.lineWidth=2; cx.beginPath(); cx.moveTo(15,0); cx.lineTo(800,0); cx.stroke(); cx.globalCompositeOperation='source-over'; noGlow(); cx.restore();
+
+        cx.save(); cx.translate(0, -90); glow(K.blue, 40); cx.globalCompositeOperation='screen';
+        const fw=100, fh=100, nb=21, bw=fw/nb;
+        for(let i=0; i<nb; i++) {
+            const amp=0.5+Math.abs(Math.sin(t*15+i))*0.5+(Math.random()*0.2), th=fh*amp, bx=-fw/2+i*bw, by=0;
+            cx.fillStyle=`rgba(${Math.floor(i*(255/nb))},100,255,0.9)`;
+            const iLE=(i>=4&&i<=7), iRE=(i>=13&&i<=16), iM=(i>=6&&i<=14);
+            let yT=by-th/2, yB=by+th/2, egT=by-20, egB=by-5;
+            if((iLE||iRE)&&yT<egT) { cx.fillRect(bx,yT,bw-2,egT-yT); if(!iM){ cx.fillRect(bx,egB,bw-2,yB-egB); }else{ cx.fillRect(bx,egB,bw-2,(by+15)-egB); cx.fillRect(bx,by+30,bw-2,yB-(by+30)); } }
+            else if(iM) { cx.fillRect(bx,yT,bw-2,(by+15)-yT); cx.fillRect(bx,by+30,bw-2,yB-(by+30)); }
+            else { cx.fillRect(bx,yT,bw-2,th); }
+        }
+        cx.globalCompositeOperation='source-over'; noGlow(); cx.restore(); cx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  PHASE 4 : MAINFRAME MASSIF (ANCIENNEMENT PHASE 3)
+    // ═══════════════════════════════════════════════════════════
+    else if (currentPhase === 4) {
+        const t = tT / 1000;
+        const cycleLength = 8, localTime = t % cycleLength, isVuln = localTime > 6, transition = isVuln ? (localTime - 6)/2 : 0; 
+        const beatPulse = Math.pow(Math.sin(t * Math.PI * 4), 2);
+
+        cx.save(); const shakeForce = isVuln ? 1 : 10 + beatPulse * 5; cx.translate((Math.random()-0.5)*shakeForce, (Math.random()-0.5)*shakeForce);
+
+        const bgCenter = isVuln ? `rgba(60, 40, 0, 1)` : `rgba(40, 0, 10, 1)`, bgMid = isVuln ? `rgba(20, 10, 0, 1)` : `rgba(15, 0, 5, 1)`, bgEdge = isVuln ? `rgba(10, 5, 0, 1)` : `rgba(5, 0, 0, 1)`;
+        const bgGrad = cx.createRadialGradient(centerX, centerY + 100, 50, centerX, centerY, H);
+        bgGrad.addColorStop(0, bgCenter); bgGrad.addColorStop(0.6, bgMid); bgGrad.addColorStop(1, bgEdge); cx.fillStyle = bgGrad; cx.fillRect(-20, -20, W+40, H+40);
+
+        cx.save(); cx.globalCompositeOperation = "screen"; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+        if (!isVuln) { cx.font = '900 160px Orbitron'; cx.fillStyle = `rgba(255, 0, 60, ${0.05 + beatPulse*0.08})`; cx.fillText("FORMAT", centerX, centerY-180); cx.fillText("PURGE", centerX, centerY+180); cx.font = '20px Share Tech Mono'; cx.fillStyle = `rgba(255, 0, 60, 0.1)`; for(let i=0; i<10; i++) cx.fillText("01000110 01000001 01010100 01000001 01001100", centerX, i*80); }
+        else { cx.font = '900 100px Orbitron'; cx.fillStyle = `rgba(255, 215, 0, ${0.1 + Math.sin(t*20)*0.1})`; cx.fillText("SYSTEM FATAL ERROR", centerX, centerY-180); cx.fillText("CORE EXPOSED", centerX, centerY+180); }
+        cx.restore();
+
+        cx.globalAlpha = 0.5;
+        for (let i = 0; i < 150; i++) { const dropX = (Math.sin(i*123.45)*0.5+0.5)*W, speedMult = isVuln ? 0.8 : 2.5, dropY = ((Math.cos(i*321.12)*0.5+0.5)*H + tT*(speedMult + (i%5)*0.3)) % H; if (dropX>centerX-100 && dropX<centerX+100 && dropY>centerY) continue; cx.fillStyle = isVuln ? `rgba(255, 215, 0, ${0.3 + (i%5)*0.1})` : `rgba(255, 0, 60, ${0.3 + (i%5)*0.1})`; cx.fillRect(dropX, dropY, 4+(i%4), 15+(i%20)); }
+        cx.globalAlpha = 1;
+
+        const bridgeWidth = 140, bridgeTop = centerY + 50;
+        cx.save(); glow(isVuln ? K.gold : K.red, 30); cx.fillStyle = `rgba(10, 2, 5, 0.95)`; cx.fillRect(centerX-bridgeWidth/2, bridgeTop, bridgeWidth, H-bridgeTop); cx.strokeStyle = isVuln ? K.gold : K.red; cx.lineWidth = 6; cx.beginPath(); cx.moveTo(centerX-bridgeWidth/2, bridgeTop); cx.lineTo(centerX-bridgeWidth/2, H); cx.moveTo(centerX+bridgeWidth/2, bridgeTop); cx.lineTo(centerX+bridgeWidth/2, H); cx.stroke();
+        cx.lineWidth = 2; cx.strokeStyle = isVuln ? `rgba(255, 215, 0, 0.4)` : `rgba(255, 0, 60, 0.3)`; const bOffset = (tT/3)%60; for(let y=bridgeTop+bOffset; y<H; y+=60) { cx.beginPath(); cx.moveTo(centerX-bridgeWidth/2, y); cx.lineTo(centerX+bridgeWidth/2, y); cx.stroke(); } noGlow(); cx.restore();
+
+        if (!isVuln) {
+            cx.save(); cx.globalCompositeOperation = "screen"; const beamWidth = bridgeWidth*0.85 + beatPulse*25; glow(K.red, 60); cx.fillStyle = `rgba(255, 0, 40, 0.8)`; cx.fillRect(centerX-beamWidth/2, centerY, beamWidth, H-centerY); glow('#fff', 20); cx.fillStyle = '#fff'; cx.fillRect(centerX-beamWidth/4, centerY, beamWidth/2, H-centerY);
+            cx.strokeStyle = `rgba(255, 0, 60, ${1-beatPulse})`; cx.lineWidth = 10*beatPulse; cx.beginPath(); cx.ellipse(centerX, centerY+100, beamWidth*1.5, 30+beatPulse*20, 0, 0, Math.PI*2); cx.stroke();
+            cx.fillStyle = K.red; for(let i=0; i<30; i++) { const px=centerX+(Math.random()-0.5)*beamWidth*2, py=centerY+Math.random()*(H-centerY), size=Math.random()*8+4; cx.fillRect(px, py, size, size); } cx.restore();
+        } else {
+            cx.save(); glow(K.gold, 20); cx.font = '900 28px Orbitron'; cx.fillStyle = K.gold; cx.textAlign = 'center'; cx.globalAlpha = 0.6 + Math.sin(t*15)*0.4; cx.scale(1, 2); cx.fillText("VULNÉRABLE", centerX, (centerY+150)/2); cx.scale(1, 0.5); cx.strokeStyle = K.gold; cx.lineWidth = 4; cx.setLineDash([15, 15]); cx.lineDashOffset = -tT/5; cx.beginPath(); cx.moveTo(centerX, centerY+80); cx.lineTo(centerX, H); cx.stroke(); cx.restore();
+        }
+
+        cx.save(); const bossBounce = Math.abs(Math.sin(t*Math.PI*4))*25; cx.translate(centerX, centerY-80+bossBounce); cx.scale(1.3, 1.3);
+
+        if (!isVuln) {
+            const subDist = 110 + beatPulse*20;
+            const drawSubwoofer = (dir) => { cx.save(); cx.translate(dir*subDist, -20); glow(K.red, 20); cx.fillStyle='#05000a'; cx.fillRect(-35,-70,70,140); cx.strokeStyle=K.red; cx.lineWidth=3; cx.strokeRect(-35,-70,70,140); noGlow(); cx.fillStyle='#111'; cx.beginPath(); cx.arc(0,-30,25,0,Math.PI*2); cx.fill(); cx.beginPath(); cx.arc(0,30,25,0,Math.PI*2); cx.fill(); cx.fillStyle=K.red; const membrane=15+beatPulse*10; cx.beginPath(); cx.arc(0,-30,membrane,0,Math.PI*2); cx.fill(); cx.beginPath(); cx.arc(0,30,membrane,0,Math.PI*2); cx.fill(); cx.restore(); };
+            drawSubwoofer(-1); drawSubwoofer(1);
+
+            glow(K.pur, 40); cx.fillStyle='#0a0014'; cx.beginPath(); cx.moveTo(-80,-90); cx.lineTo(80,-90); cx.lineTo(100,-30); cx.lineTo(100,50); cx.lineTo(60,90); cx.lineTo(-60,90); cx.lineTo(-100,50); cx.lineTo(-100,-30); cx.closePath(); cx.fill(); cx.strokeStyle=K.pur; cx.lineWidth=5; cx.stroke();
+            noGlow(); cx.fillStyle='#000'; cx.fillRect(-60,-50,120,100); glow(K.red, 20); cx.fillStyle=K.red; const eqBars=15, barW=120/eqBars;
+            for(let i=0; i<eqBars; i++) { let baseHeight=80-Math.abs(i-Math.floor(eqBars/2))*12, h=baseHeight*(0.4+beatPulse*0.6)+Math.random()*10; cx.fillRect(-60+i*barW+1, -h/2, barW-2, h); }
+            cx.fillStyle='#fff'; cx.globalAlpha=0.5+beatPulse*0.5; cx.beginPath(); cx.ellipse(0,0,40+beatPulse*10, 10+beatPulse*10, 0, 0, Math.PI*2); cx.fill(); cx.globalAlpha=1;
+        } else {
+            noGlow(); cx.fillStyle='#0a0014'; cx.strokeStyle=K.red; cx.lineWidth=2;
+            for(let i=0; i<16; i++) { cx.save(); const a=(i/16)*Math.PI*2+t*0.5, dist=100+Math.sin(t*3+i)*30+(transition*50); cx.translate(Math.cos(a)*dist, Math.sin(a)*dist); cx.rotate(t*3+i); cx.fillRect(-15,-15,30,30); cx.strokeRect(-15,-15,30,30); cx.restore(); }
+            const panicPulse = Math.pow(Math.sin(t*20), 2); cx.scale(1+panicPulse*0.15, 1+panicPulse*0.15);
+            glow(K.gold, 80+panicPulse*40); cx.fillStyle=`rgba(255, 215, 0, 0.2)`; cx.beginPath(); cx.arc(0,0,80,0,Math.PI*2); cx.fill();
+            cx.fillStyle='#fff'; cx.beginPath(); cx.moveTo(0,-60); cx.lineTo(40,0); cx.lineTo(0,60); cx.lineTo(-40,0); cx.closePath(); cx.fill(); cx.strokeStyle=K.gold; cx.lineWidth=6; cx.stroke();
+            noGlow(); cx.fillStyle=K.red; for(let i=0; i<10; i++) { const fa=Math.random()*Math.PI*2, fd=30+Math.random()*80; cx.fillRect(Math.cos(fa)*fd, Math.sin(fa)*fd, 5, 5); }
+        }
+        cx.restore(); if (!isVuln) cx.restore();
+    }
+
+    requestAnimationFrame(draw);
+}
+
+// Dessine une grille discrète
+function drawHelperGrid() {
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.05)'; cx.lineWidth = 1;
+    for(let i=0; i<W; i+=50) { cx.beginPath(); cx.moveTo(i,0); cx.lineTo(i,H); cx.stroke(); }
+    for(let j=0; j<H; j+=50) { cx.beginPath(); cx.moveTo(0,j); cx.lineTo(W,j); cx.stroke(); }
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    cx.beginPath(); cx.moveTo(W/2, 0); cx.lineTo(W/2, H); cx.stroke();
+    cx.beginPath(); cx.moveTo(0, H/2); cx.lineTo(W, H/2); cx.stroke();
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

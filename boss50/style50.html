@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — LE NÉANT (Phases 1 à 6)</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#010002;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff; cursor:crosshair;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+/* Effet Cathodique et Vignette */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.5) 50%), radial-gradient(ellipse at center, transparent 30%, rgba(0,0,0,0.9) 100%);background-size:100% 2px, 100% 100%;opacity:0.8;}
+
+/* ─── INTERFACE DE CONTRÔLE ───────────────────────────────────────────────── */
+#ui-layer {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100;
+    display: flex; flex-direction: column; gap: 10px; align-items: center;
+    width: 95%; max-width: 1000px;
+}
+
+.boss-title { font-family: 'Orbitron', sans-serif; font-size: 36px; color: #FF003C; text-shadow: 0 0 30px #FF003C, 0 0 10px #FF003C; font-weight: 900; letter-spacing: 15px; text-transform: uppercase; transition: all 0.5s;}
+.boss-subtitle { font-size: 14px; color: #FFD700; letter-spacing: 6px; text-shadow: 0 0 10px #FFD700; font-family: 'Orbitron', sans-serif; transition: color 0.5s;}
+
+#hp-bar-container {
+    width: 100%; height: 6px; background: #110000; border: 1px solid #FF003C; position: relative;
+    box-shadow: 0 0 20px rgba(255, 0, 60, 0.4); transition: all 0.5s;
+}
+#hp-bar-fill {
+    width: 100%; height: 100%; background: linear-gradient(90deg, #550000, #FF003C, #FF4444);
+    box-shadow: 0 0 15px #FF003C; transition: all 0.5s;
+}
+
+.row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; justify-content: center;}
+.btn {
+    padding: 8px 12px; border: 2px solid #555; background: transparent; color: #aaa;
+    cursor: pointer; font-size: 0.85rem; font-family: 'Orbitron', sans-serif; font-weight: bold;
+    transition: all 0.2s; letter-spacing: 1px; text-transform: uppercase;
+}
+.btn:hover { color: #fff; border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+.btn.active { color: #FF003C; border-color: #FF003C; box-shadow: 0 0 15px rgba(255,0,60,0.6); background: rgba(255,0,60,0.1); }
+
+#lore-text {
+    position: fixed; top: 20px; width: 100%; text-align: center; z-index: 100;
+    font-size: 15px; color: #888; font-style: italic; letter-spacing: 3px; transition: color 0.5s;
+}
+
+/* Flash d'écran pour transitions violentes */
+#flash { position: fixed; inset: 0; background: #fff; z-index: 95; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="flash"></div>
+
+<div id="lore-text" id="lore">"La haine n'est pas un bug. C'est la seule vérité du système."</div>
+
+<div id="ui-layer">
+    <div class="boss-title" id="boss-name">LE NÉANT</div>
+    <div class="boss-subtitle" id="boss-desc">PHASE 1 : LE SOUVERAIN DÉCHU</div>
+    <div id="hp-bar-container"><div id="hp-bar-fill"></div></div>
+    
+    <div class="row">
+        <button class="btn active" id="btn-1" onclick="setPhase(1)">PH1 (Sage)</button>
+        <button class="btn" id="btn-2" onclick="setPhase(2)">PH2 (Corrompu)</button>
+        <button class="btn" id="btn-3" onclick="setPhase(3)">PH3 (Assimilé)</button>
+        <button class="btn" id="btn-4" onclick="setPhase(4)">PH4 (Singularité)</button>
+        <button class="btn" id="btn-5" onclick="setPhase(5)">PH5 (Surcharge)</button>
+        <button class="btn" id="btn-6" onclick="setPhase(6)">PH6 (DIEU DU NÉANT)</button>
+    </div>
+</div>
+
+<script>
+"use strict";
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  CONFIGURATION DU CANVAS
+// ═════════════════════════════════════════════════════════════════════════════
+const cv = document.getElementById('c'), cx = cv.getContext('2d', { alpha: false });
+let W, H, cX, cY;
+let mx = window.innerWidth/2, my = window.innerHeight/2;
+let currentPhase = 1;
+
+let globalT = 0, lastTime = 0;
+let eyeTrackX = 0, eyeTrackY = 0;
+
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; cX = W/2; cY = H/2 - 30; }
+window.addEventListener('resize', resize); resize();
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  GESTION DES PHASES (UI et Couleurs thématiques)
+// ═════════════════════════════════════════════════════════════════════════════
+const phaseData = {
+    1: { col: '#FF003C', title: 'PHASE 1 : LE SOUVERAIN DÉCHU', lore: '"La haine n\'est pas un bug. C\'est la seule vérité du système."', bgEnd: '#110000', barGrad: 'linear-gradient(90deg, #550000, #FF003C, #FF4444)' },
+    2: { col: '#b8008a', title: 'PHASE 2 : LA CORRUPTION S\'ÉTEND', lore: '"Le code mort saigne. L\'anomalie prend racine."', bgEnd: '#110011', barGrad: 'linear-gradient(90deg, #440044, #b8008a, #ff00cc)' },
+    3: { col: '#8A2BE2', title: 'PHASE 3 : ASSIMILATION TOTALE', lore: '"Plus rien n\'est pur. Je suis le système."', bgEnd: '#10001a', barGrad: 'linear-gradient(90deg, #220044, #8A2BE2, #b455ff)' },
+    4: { col: '#FFFFFF', title: 'PHASE 4 : SINGULARITÉ ABSOLUE', lore: '"... E R R O R ... R E A L I T Y   D E S T R O Y E D ..."', bgEnd: '#000000', barGrad: 'linear-gradient(90deg, #000, #FF00FF, #FFF)' },
+    5: { col: '#FFD700', title: 'PHASE 5 : SURCHARGE CRITIQUE !', lore: '"... A N O M A L Y   C R I T I C A L ... P R E P A R E   F O R   E R A S U R E ..."', bgEnd: '#220000', barGrad: 'linear-gradient(90deg, #FF00FF, #FFD700, #FFF)' },
+    6: { col: '#FFFFFF', title: 'PHASE 6 : LE DIEU DU NÉANT', lore: '"I   A M   A B S O L U T E."', bgEnd: '#000000', barGrad: 'linear-gradient(90deg, #FFFFFF, #FFD700, #FFFFFF)' }
+};
+
+function setPhase(p) {
+    if (p >= 4 && currentPhase !== p) {
+        document.getElementById('flash').style.opacity = 1;
+        setTimeout(() => { document.getElementById('flash').style.opacity = 0; }, 150);
+    }
+
+    currentPhase = p;
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${p}`).classList.add('active');
+
+    const data = phaseData[p];
+    
+    document.getElementById('boss-name').style.color = data.col;
+    document.getElementById('boss-name').style.textShadow = p===4 ? '0 0 40px #FF00FF, 0 0 20px #FFF' : (p===6 ? '0 0 50px #FFF, 0 0 20px #FFD700' : `0 0 30px ${data.col}, 0 0 10px ${data.col}`);
+    document.getElementById('boss-desc').textContent = data.title;
+    document.getElementById('boss-desc').style.color = p === 1 ? '#FFD700' : (p === 2 ? '#ffaa00' : (p === 3 ? '#8A2BE2' : (p === 4 ? '#FF00FF' : '#FFF')));
+    
+    document.getElementById('hp-bar-container').style.borderColor = p===6 ? '#FFF' : data.col;
+    document.getElementById('hp-bar-container').style.boxShadow = `0 0 20px ${p===6?'#FFF':data.col}66`;
+    document.getElementById('hp-bar-fill').style.background = data.barGrad;
+    document.getElementById('hp-bar-fill').style.boxShadow = `0 0 15px ${p===6?'#FFD700':data.col}`;
+    
+    document.getElementById('lore-text').textContent = data.lore;
+    document.getElementById('lore-text').style.color = p >= 4 ? '#FFF' : (p === 3 ? '#b455ff' : '#888');
+    document.getElementById('lore-text').style.textShadow = p === 6 ? '0 0 15px #FFF' : (p === 4 ? '0 0 10px #FF00FF' : 'none');
+
+    document.querySelectorAll('.btn').forEach(btn => {
+        if(btn.classList.contains('active')) {
+            btn.style.color = data.col; btn.style.borderColor = data.col;
+            btn.style.background = p>=4 ? 'rgba(255,255,255,0.2)' : `rgba(${p===1?'255,0,60':(p===2?'184,0,138':'138,43,226')}, 0.1)`;
+            btn.style.boxShadow = `0 0 15px ${data.col}99`;
+        } else {
+            btn.style.color = '#aaa'; btn.style.borderColor = '#555'; btn.style.background = 'transparent'; btn.style.boxShadow = 'none';
+        }
+    });
+}
+setPhase(1);
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  SYSTÈMES DE PARTICULES ET DÉCORS
+// ═════════════════════════════════════════════════════════════════════════════
+class CollapseSystem {
+    constructor() { this.debris = []; for(let i=0; i<50; i++) this.spawn(true); }
+    spawn(initial = false) {
+        this.debris.push({
+            x: (Math.random() - 0.5) * W * 2.5 + cX,
+            y: initial ? Math.random() * H * 1.5 - H : -Math.random() * 500 - 200,
+            z: Math.random() * 4 + 1, sizeX: Math.random() * 150 + 50, sizeY: Math.random() * 300 + 100,
+            rot: Math.random() * Math.PI * 2, rotSpeed: (Math.random() - 0.5) * 0.01,
+            vy: Math.random() * 2 + 0.5, color: Math.random() > 0.8 ? '#0a0005' : '#030005'
+        });
+    }
+    updateAndDraw(t, phase) {
+        if (phase === 6) return; // P6: Le décor est totalement annihilé, pur vide.
+
+        cx.save();
+        const riftCol = phase >= 4 ? phaseData[phase].col : phaseData[phase].col;
+        
+        if (phase < 4) {
+            glow(riftCol, 20); cx.strokeStyle = `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.15)`; cx.lineWidth = 2;
+            for(let i=0; i<5; i++) {
+                cx.beginPath(); let startX = cX + (i-2)*300; cx.moveTo(startX, 0);
+                for(let y=0; y<H*0.7; y+=100) { cx.lineTo(startX + Math.sin(y*0.01 + t)*50 + (Math.random()-0.5)*20, y); } cx.stroke();
+            }
+        } else {
+            glow(phase===5 ? '#FFD700' : '#FF00FF', 30); cx.strokeStyle = '#FFF'; cx.lineWidth = phase===5 ? 4 : 2;
+            for(let i=0; i<(phase===5 ? 12 : 8); i++) {
+                cx.beginPath(); cx.moveTo(Math.random()*W, 0);
+                let curX = Math.random()*W, curY = 0;
+                for(let j=0; j<5; j++) { curX += (Math.random()-0.5)*200; curY += Math.random()*200; cx.lineTo(curX, curY); }
+                cx.stroke();
+            }
+        }
+        noGlow(); cx.restore();
+
+        const speedMult = phase === 5 ? 8 : (phase === 4 ? 4 : 1);
+        for(let i = this.debris.length - 1; i >= 0; i--) {
+            let d = this.debris[i];
+            d.y += d.vy * speedMult * (5 / d.z); d.rot += d.rotSpeed * speedMult;
+            cx.save(); cx.translate(d.x, d.y); cx.rotate(d.rot);
+            let alpha = Math.max(0.1, 1 - (d.z / 5)); cx.globalAlpha = alpha;
+            
+            cx.fillStyle = d.color;
+            cx.strokeStyle = phase >= 4 ? `rgba(${phase===5?'255,215,0':'255,0,255'},0.2)` : `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.05)`;
+            cx.lineWidth = phase >= 4 ? 4 : 2;
+            cx.fillRect(-d.sizeX/2, -d.sizeY/2, d.sizeX, d.sizeY); cx.strokeRect(-d.sizeX/2, -d.sizeY/2, d.sizeX, d.sizeY);
+            
+            if (phase >= 2) {
+                cx.fillStyle = phase >= 4 ? (phase===5?'#FFD700':'#FF00FF') : `rgba(138, 43, 226, ${phase === 3 ? 0.3 : 0.1})`;
+                cx.fillRect(-d.sizeX/2 + 10, -d.sizeY/2 + 20, d.sizeX - 20, 10);
+            }
+            cx.restore();
+            if(d.y > H + d.sizeY) { this.debris.splice(i, 1); this.spawn(); }
+        }
+        cx.globalAlpha = 1;
+    }
+}
+const collapse = new CollapseSystem();
+
+class EmberSystem {
+    constructor() { this.particles = []; }
+    spawn(phase) {
+        if(Math.random() < (phase >= 3 ? 0.8 : 0.6)) {
+            let startY = phase >= 4 ? (Math.random() < 0.5 ? -10 : H+10) : H + 10;
+            if (phase === 6) { startY = Math.random() < 0.5 ? -10 : H+10; } // En P6, ça vient de partout et ça converge
+            
+            this.particles.push({
+                x: phase === 6 ? (Math.random() < 0.5 ? -10 : W+10) : Math.random() * W, 
+                y: startY,
+                vx: phase === 6 ? 0 : (Math.random() - 0.5) * (phase>=4?15:1.5), 
+                vy: phase === 6 ? 0 : (phase>=4 ? (Math.random()-0.5)*15 : -Math.random() * 2 - 1),
+                size: Math.random() * 3 + 1.5, life: 1, maxLife: Math.random() * 150 + 50
+            });
+        }
+    }
+    updateAndDraw(t, phase) {
+        cx.globalCompositeOperation = 'screen';
+        for(let i = this.particles.length - 1; i >= 0; i--) {
+            let p = this.particles[i];
+            
+            if (phase === 6) {
+                // Aspiration vers le centre absolu
+                let dx = cX - p.x;
+                let dy = (cY - 50) - p.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                p.vx += (dx / dist) * 0.2;
+                p.vy += (dy / dist) * 0.2;
+                // Friction
+                p.vx *= 0.98; p.vy *= 0.98;
+            } else {
+                p.vx += Math.sin(t*2 + p.y*0.01)*0.5; // Turbulence normale
+            }
+
+            p.x += p.vx; p.y += p.vy; p.life++;
+            let lifeRatio = p.life / p.maxLife; let alpha = Math.sin(lifeRatio * Math.PI);
+            
+            let r = 255, g = 0, b = 0;
+            if (phase === 1) { if (lifeRatio < 0.3) { g = 200; b = 100; } else if (lifeRatio < 0.6) { g = 50; } else { r = 150; } } 
+            else if (phase === 2) { if (lifeRatio < 0.3) { g = 100; b = 200; } else if (lifeRatio < 0.6) { g = 0; b = 100; } else { r = 180; b = 80; } } 
+            else if (phase === 3) { r = 138; g = 43; b = 226; }
+            else if (phase === 4) { r = 255; g = 0; b = 255; }
+            else if (phase === 5) { r = 255; g = 215; b = 0; }
+            else { r = 255; g = 255; b = 255; } // P6: Pure lumière blanche
+
+            glow(`rgba(${r},${g},${b},1)`, 15); cx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+            cx.beginPath(); cx.arc(p.x, p.y, p.size * (1-lifeRatio*0.5), 0, Math.PI*2); cx.fill();
+            
+            // Destruction de la particule
+            let distToCenter = Math.sqrt(Math.pow(p.x - cX, 2) + Math.pow(p.y - (cY-50), 2));
+            if(p.life >= p.maxLife || (phase === 6 && distToCenter < 40) || (phase !== 6 && (p.y < -50 || p.y > H+50 || p.x < -50 || p.x > W+50))) {
+                this.particles.splice(i, 1);
+            }
+        }
+        cx.globalCompositeOperation = 'source-over'; noGlow();
+    }
+}
+const embers = new EmberSystem();
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LE DÉCOR
+// ═════════════════════════════════════════════════════════════════════════════
+function drawCathedralArena(t, phase) {
+    if (phase === 6) {
+        // Phase 6 : Le Vide Cosmique Parfait
+        cx.fillStyle = '#000000'; cx.fillRect(0, 0, W, H);
+        
+        // Nébuleuse lente en fond
+        cx.globalCompositeOperation = 'screen';
+        let bgGrad = cx.createRadialGradient(cX, cY-50, 50, cX, cY-50, W);
+        bgGrad.addColorStop(0, 'rgba(138, 43, 226, 0.3)'); // Violet profond
+        bgGrad.addColorStop(0.5, 'rgba(255, 215, 0, 0.05)'); // Or divin
+        bgGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        cx.fillStyle = bgGrad; cx.fillRect(0, 0, W, H);
+        cx.globalCompositeOperation = 'source-over';
+        return;
+    }
+
+    let grad = cx.createLinearGradient(0, 0, 0, H);
+    grad.addColorStop(0, phase >= 4 ? '#050005' : '#010003'); 
+    grad.addColorStop(0.5, phase >= 4 ? '#000' : '#05000a'); 
+    grad.addColorStop(1, phaseData[phase].bgEnd);
+    cx.fillStyle = grad; cx.fillRect(0, 0, W, H);
+
+    collapse.updateAndDraw(t, phase);
+
+    if (phase < 4) {
+        cx.save(); cx.translate(cX, H * 0.7);
+        cx.strokeStyle = `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.05)`; cx.lineWidth = 2;
+        for(let i = -W; i <= W; i += 80) { let wave = Math.sin(t + i*0.01) * 20; cx.beginPath(); cx.moveTo(i*3 + wave, H); cx.lineTo(i*0.2, -H*0.2); cx.stroke(); }
+        for(let j = 0; j <= H; j += Math.pow(j, 1.1)*0.1 + 10) { cx.beginPath(); cx.moveTo(-W, j); cx.lineTo(W, j); cx.stroke(); }
+
+        noGlow(); cx.fillStyle = '#020002'; cx.strokeStyle = '#110000'; cx.lineWidth = 1;
+        for(let i = -1; i <= 1; i+=2) {
+            let pilX = i*400 - 50;
+            cx.fillRect(pilX, -H, 100, H); cx.strokeRect(pilX, -H, 100, H);
+            cx.fillStyle = '#010003'; 
+            for(let m=0; m<3; m++) { cx.beginPath(); cx.arc(pilX + (i===-1?100:0), -H*0.8 + m*250, 40 + Math.sin(t*2+m)*10, 0, Math.PI*2); cx.fill(); }
+            cx.fillStyle = `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.3)`;
+            for(let k=0; k<5; k++) { cx.fillRect(pilX + 30, -H + ((t*50 + k*200) % H), 40, 5); }
+            cx.fillStyle = '#020002';
+        }
+        cx.restore();
+    } else {
+        cx.save(); cx.translate(cX, cY);
+        cx.strokeStyle = phase === 5 ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 0, 255, 0.1)'; 
+        cx.lineWidth = phase === 5 ? 2 : 1;
+        const warpSpeed = phase === 5 ? t*3 : t;
+        for(let i = 0; i < Math.PI*2; i+=0.2) {
+            cx.beginPath(); cx.moveTo(Math.cos(i)*100, Math.sin(i)*100);
+            cx.lineTo(Math.cos(i+warpSpeed)*(W), Math.sin(i-warpSpeed)*(W)); cx.stroke();
+        }
+        for(let r = 200; r < W; r+=150) { cx.beginPath(); cx.arc(0, 0, r + Math.sin(t*10)*20, 0, Math.PI*2); cx.stroke(); }
+        cx.restore();
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LE NÉANT (Phases 1 à 3 : Le Souverain Muté)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawTheSovereign(t, phase) {
+    cx.save(); 
+    const mainCol = phaseData[phase].col; 
+    const haloCol = phase >= 3 ? '#8A2BE2' : '#FFD700'; 
+    const glitchIntensity = phase === 1 ? 0 : (phase === 2 ? 1.5 : 4);
+    const singRadius = 250 + (phase - 1) * 30; 
+    const gx = (Math.random() - 0.5) * glitchIntensity; const gy = (Math.random() - 0.5) * glitchIntensity;
+    const hoverY = Math.sin(t * 1.5) * 15;
+    cx.translate(cX + gx, cY + hoverY + gy);
+
+    cx.save(); cx.globalCompositeOperation = 'screen';
+    for(let i=0; i<3; i++) {
+        cx.rotate(t * (0.5 + i*0.2));
+        const innerCol = '#8A2BE2', outerCol = phase >= 3 ? '#8A2BE2' : '#FF003C';
+        glow(innerCol, 40); cx.strokeStyle = `rgba(138, 43, 226, ${0.1 + i*0.1})`; cx.lineWidth = 15; cx.beginPath(); cx.ellipse(0, -50, singRadius + Math.sin(t*3)*10, singRadius*0.8, 0, 0, Math.PI*2); cx.stroke();
+        glow(outerCol, 30); cx.strokeStyle = phase >= 3 ? `rgba(138, 43, 226, ${0.2 + i*0.1})` : `rgba(255, 0, 60, ${0.2 + i*0.1})`; cx.lineWidth = 4; cx.beginPath(); cx.ellipse(0, -50, singRadius+10 + Math.sin(t*4)*15, (singRadius+10)*0.8, 0, 0, Math.PI*2); cx.stroke();
+    }
+    cx.restore(); noGlow();
+
+    cx.save(); cx.translate(0, -180); cx.rotate(-t * 0.4);
+    glow(haloCol, 20); cx.strokeStyle = phase >= 3 ? 'rgba(138, 43, 226, 0.7)' : 'rgba(255, 215, 0, 0.7)'; cx.lineWidth = 8; cx.lineCap = 'round';
+    const fragments = phase === 3 ? [{a1: 0, a2: 0.8}, {a1: 1.8, a2: 2.2}, {a1: 3.5, a2: 4.0}, {a1: 5.5, a2: 5.8}] : [{a1: 0, a2: 1.2}, {a1: 1.5, a2: 2.8}, {a1: 3.2, a2: 4.5}, {a1: 5.0, a2: 6.0}];
+    fragments.forEach(f => { let r = 120 + Math.sin(t*2 + f.a1)*5; cx.beginPath(); cx.arc(0, 0, r, f.a1, f.a2); cx.stroke(); });
+    cx.fillStyle = haloCol; noGlow();
+    for(let i=0; i<6; i++) { cx.fillRect(Math.cos(i + t)*120, Math.sin(i + t)*120 + (t*50 % 100), 3, 3); } cx.restore();
+
+    cx.fillStyle = '#010003'; glow(phase >= 3 ? '#220044' : '#110000', 20); cx.strokeStyle = phase >= 3 ? '#440066' : '#330000'; cx.lineWidth = 2;
+    const numRibbons = 12;
+    for(let i=0; i<numRibbons; i++) {
+        cx.save(); let side = i % 2 === 0 ? 1 : -1; let id = Math.floor(i/2); let wildness = phase === 1 ? 0.1 : (phase === 2 ? 0.3 : 0.6); cx.rotate(side * (0.4 + id * 0.15) + Math.sin(t* (1 + phase) + id) * wildness);
+        let length = 300 + id * 50 + Math.sin(t*2 + id)*30; let cpx1 = side * 150; let cpy1 = 150; let cpx2 = side * 50 + Math.sin(t*3)*50; let cpy2 = length * 0.7;
+        cx.beginPath(); cx.moveTo(0, -50); cx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, side*20, length); cx.bezierCurveTo(cpx2 - side*40, cpy2, cpx1 - side*30, cpy1, 0, 50); cx.fill(); cx.stroke(); cx.restore();
+    }
+
+    cx.save(); let swordAngle = Math.PI*0.15 + Math.sin(t)*0.05 + (phase >= 2 ? Math.sin(t*10)*0.05 : 0); cx.translate(-120, 40); cx.rotate(swordAngle);
+    cx.fillStyle = '#111'; cx.fillRect(-10, -50, 20, 100); cx.fillStyle = haloCol; cx.fillRect(-30, -50, 60, 15);
+    glow(mainCol, 40); cx.fillStyle = 'rgba(20, 0, 5, 0.9)'; cx.strokeStyle = mainCol; cx.lineWidth = 5;
+    cx.beginPath(); cx.moveTo(-25, 50); cx.lineTo(25, 50); cx.lineTo(15, 350); cx.lineTo(0, 400); cx.lineTo(-15, 350); cx.closePath(); cx.fill(); cx.stroke();
+    cx.globalCompositeOperation = 'screen'; cx.fillStyle = `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.6)`;
+    cx.beginPath(); cx.moveTo(-10, 60); cx.lineTo(10, 60); cx.lineTo(0, 380); cx.fill(); cx.globalCompositeOperation = 'source-over';
+    noGlow(); cx.fillStyle = mainCol; for(let k=0; k<3; k++) if(Math.random() < 0.3) cx.fillRect((Math.random()-0.5)*30, 100 + Math.random()*250, 2, 10);
+    if (phase >= 2) { cx.fillStyle = '#8A2BE2'; for(let k=0; k<5; k++) { if(Math.random() < 0.5) cx.fillRect((Math.random()-0.5)*40, 50 + Math.random()*300, Math.random()*15+5, 3); } } cx.restore();
+
+    noGlow(); cx.fillStyle = '#050005'; cx.strokeStyle = haloCol; cx.lineWidth = 3;
+    cx.beginPath(); cx.moveTo(-60, -100); cx.lineTo(60, -100); cx.lineTo(40, 50); cx.lineTo(0, 100); cx.lineTo(-40, 50); cx.closePath(); cx.fill(); cx.stroke();
+    glow(mainCol, 15); cx.strokeStyle = mainCol; cx.lineWidth = phase >= 3 ? 4 : 2; 
+    cx.beginPath(); cx.moveTo(-20, -100); cx.lineTo(0, 20); cx.lineTo(20, -100); cx.stroke(); cx.beginPath(); cx.moveTo(0, 20); cx.lineTo(0, 80); cx.stroke();
+
+    noGlow(); cx.fillStyle = '#000'; cx.beginPath(); cx.arc(0, -130, 35, Math.PI, 0); cx.lineTo(20, -90); cx.lineTo(-20, -90); cx.closePath(); cx.fill(); cx.strokeStyle = phase >= 3 ? '#440066' : '#330000'; cx.lineWidth = 2; cx.stroke();
+
+    let targetEyeX = clamp((mx - cX) * 0.03, -15, 15), targetEyeY = clamp((my - cY + 120) * 0.03, -10, 10); let lerpSpeed = phase === 1 ? 0.08 : (phase === 2 ? 0.15 : 0.3);
+    eyeTrackX += (targetEyeX - eyeTrackX) * lerpSpeed; eyeTrackY += (targetEyeY - eyeTrackY) * lerpSpeed;
+    cx.fillStyle = '#110000'; cx.fillRect(-25, -125, 50, 10);
+    let eTx = phase === 3 ? (Math.random()-0.5)*3 : 0, eTy = phase === 3 ? (Math.random()-0.5)*3 : 0;
+    glow(mainCol, 30); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(eyeTrackX + eTx, -120 + eyeTrackY + eTy, 4, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = mainCol; cx.beginPath(); cx.arc(eyeTrackX + eTx, -120 + eyeTrackY + eTy, 2, 0, Math.PI*2); cx.fill();
+    cx.globalCompositeOperation = 'screen';
+    let eyeGrad = cx.createLinearGradient(eyeTrackX, -120+eyeTrackY, eyeTrackX - eyeTrackX*3, -120+eyeTrackY - 20);
+    eyeGrad.addColorStop(0, `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0.8)`); eyeGrad.addColorStop(1, `rgba(${phase===1?'255,0,60':(phase===2?'184,0,138':'138,43,226')}, 0)`);
+    cx.fillStyle = eyeGrad; cx.beginPath(); cx.arc(eyeTrackX + eTx, -120 + eyeTrackY + eTy, 5, 0, Math.PI*2); cx.fill(); cx.globalCompositeOperation = 'source-over'; noGlow();
+
+    cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LE NÉANT (Phase 4 : La Singularité Absolue)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawUltimateVoid(t) {
+    cx.save(); cx.translate(cX + (Math.random()-0.5)*15, cY + (Math.random()-0.5)*15 - 50);
+
+    glow('#FF00FF', 80); cx.fillStyle = '#000'; cx.beginPath();
+    for(let i=0; i<Math.PI*2; i+=0.1) { let r = 180 + Math.sin(t*10 + i*5)*20 + Math.random()*20; if(i===0) cx.moveTo(Math.cos(i)*r, Math.sin(i)*r); else cx.lineTo(Math.cos(i)*r, Math.sin(i)*r); }
+    cx.closePath(); cx.fill(); cx.strokeStyle = '#FF00FF'; cx.lineWidth = 5; cx.stroke();
+
+    cx.globalCompositeOperation = 'screen';
+    for(let i=0; i<4; i++) {
+        cx.save(); cx.rotate(t * (1 + i*0.5)); cx.scale(1, 0.3 + Math.sin(t*2+i)*0.1); 
+        glow('#FFF', 30); cx.strokeStyle = i%2===0 ? '#FF00FF' : '#FFF'; cx.lineWidth = 10 + Math.random()*10; cx.beginPath(); cx.arc(0, 0, 300 + Math.sin(t*5)*30, 0, Math.PI*2); cx.stroke(); cx.restore();
+    }
+    cx.globalCompositeOperation = 'source-over';
+
+    noGlow(); cx.strokeStyle = '#000'; cx.lineWidth = 20; cx.lineCap = 'round';
+    for(let i=0; i<8; i++) {
+        cx.save(); cx.rotate(i * (Math.PI/4) + t); cx.beginPath(); cx.moveTo(0,0); let tx = 0, ty = 0;
+        for(let j=0; j<5; j++) { tx += 50 + Math.random()*40; ty += Math.sin(t*15 + i + j) * 40; cx.lineTo(tx, ty); }
+        cx.stroke(); cx.strokeStyle = '#FF00FF'; cx.lineWidth = 4; cx.stroke(); cx.restore();
+    }
+
+    glow('#FF00FF', 50); cx.fillStyle = '#110011'; cx.beginPath(); cx.arc(0, 0, 100, 0, Math.PI*2); cx.fill(); cx.strokeStyle = '#FF00FF'; cx.lineWidth = 8; cx.stroke();
+
+    let tX = clamp((mx - cX) * 0.15, -40, 40), tY = clamp((my - cY) * 0.15, -40, 40); eyeTrackX += (tX - eyeTrackX) * 0.3; eyeTrackY += (tY - eyeTrackY) * 0.3;
+
+    glow('#FFF', 40); cx.fillStyle = '#FFF'; cx.beginPath(); cx.arc(eyeTrackX, eyeTrackY, 40 + Math.random()*5, 0, Math.PI*2); cx.fill();
+    noGlow(); cx.fillStyle = '#000'; cx.save(); cx.translate(eyeTrackX, eyeTrackY); let lookAngle = Math.atan2(eyeTrackY, eyeTrackX); cx.rotate(lookAngle + Math.PI/2);
+    cx.beginPath(); cx.ellipse(0, 0, 5, 35, 0, 0, Math.PI*2); cx.fill();
+    cx.strokeStyle = '#FF00FF'; cx.lineWidth = 4; if (Math.random() < 0.5) { cx.beginPath(); cx.moveTo(-20, -20); cx.lineTo(20, 20); cx.stroke(); cx.beginPath(); cx.moveTo(20, -20); cx.lineTo(-20, 20); cx.stroke(); }
+    cx.restore(); cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LE NÉANT (Phase 5 : La Surcharge Critique)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawOverloadVoid(t) {
+    cx.save(); cx.translate(cX + (Math.random()-0.5)*35, cY + (Math.random()-0.5)*35 - 50);
+
+    cx.globalCompositeOperation = 'screen';
+    for(let i=0; i<16; i++) {
+        cx.save(); cx.rotate(t * 8 + (i * Math.PI / 8)); cx.fillStyle = Math.random() > 0.5 ? 'rgba(255, 215, 0, 0.6)' : 'rgba(255, 0, 255, 0.6)'; glow(cx.fillStyle, 20);
+        cx.fillRect(50, -5 - Math.random()*15, W, 10 + Math.random()*30); cx.restore();
+    }
+
+    let inR1 = 1500 - ((t * 2000) % 1500), inR2 = 1500 - (((t * 2000) + 750) % 1500);
+    cx.strokeStyle = 'rgba(255, 215, 0, 0.8)'; cx.lineWidth = 20; cx.beginPath(); cx.arc(0, 0, inR1, 0, Math.PI*2); cx.stroke();
+    cx.strokeStyle = 'rgba(255, 0, 255, 0.8)'; cx.lineWidth = 10; cx.beginPath(); cx.arc(0, 0, inR2, 0, Math.PI*2); cx.stroke();
+
+    glow('#FFD700', 100); cx.fillStyle = '#000'; cx.beginPath();
+    for(let i=0; i<Math.PI*2; i+=0.1) { let r = 220 + Math.sin(t*20 + i*8)*30 + Math.random()*40; if(i===0) cx.moveTo(Math.cos(i)*r, Math.sin(i)*r); else cx.lineTo(Math.cos(i)*r, Math.sin(i)*r); }
+    cx.closePath(); cx.fill(); cx.strokeStyle = '#FFD700'; cx.lineWidth = 8; cx.stroke();
+
+    glow('#FF00FF', 80); cx.fillStyle = '#220000'; cx.beginPath(); cx.arc(0, 0, 130, 0, Math.PI*2); cx.fill(); cx.strokeStyle = '#FFD700'; cx.lineWidth = 12; cx.stroke();
+
+    cx.strokeStyle = '#FFD700'; cx.lineWidth = 4;
+    for(let i=0; i<6; i++) { cx.save(); cx.rotate((i * Math.PI*2)/6 + t); cx.beginPath(); cx.moveTo(30, 0); cx.lineTo(60 + Math.random()*20, 20); cx.lineTo(100 + Math.random()*30, -10); cx.lineTo(130, 0); cx.stroke(); cx.restore(); }
+
+    let tX = clamp((mx - cX) * 0.1, -20, 20), tY = clamp((my - cY) * 0.1, -20, 20); eyeTrackX += (tX - eyeTrackX) * 0.5; eyeTrackY += (tY - eyeTrackY) * 0.5;
+
+    glow('#FFF', 80); cx.fillStyle = '#FFF'; cx.beginPath(); cx.arc(eyeTrackX, eyeTrackY, 80 + Math.random()*15, 0, Math.PI*2); cx.fill();
+    noGlow(); cx.fillStyle = '#000'; cx.save(); cx.translate(eyeTrackX, eyeTrackY); let lookAngle = Math.atan2(eyeTrackY, eyeTrackX); cx.rotate(lookAngle + Math.PI/2);
+    cx.beginPath(); cx.ellipse(0, 0, 15 + Math.random()*5, 60, 0, 0, Math.PI*2); cx.fill(); cx.restore();
+    
+    cx.globalCompositeOperation = 'source-over'; cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  LE NÉANT (Phase 6 : LE DIEU DU NÉANT - L'Absolu)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawGodOfVoid(t) {
+    cx.save();
+    // Plus aucun tremblement. Une lévitation divine parfaite.
+    const divineHover = Math.sin(t) * 20;
+    cx.translate(cX, cY - 50 + divineHover);
+
+    // 1. AURA COSMIQUE / MANDALA GÉOMÉTRIQUE
+    cx.globalCompositeOperation = 'screen';
+    glow('#FFF', 50);
+    cx.save();
+    cx.rotate(t * 0.2); // Rotation très lente et majestueuse
+    for(let i=0; i<12; i++) {
+        cx.rotate(Math.PI / 6);
+        // Rayons de lumière pure dorée et blanche
+        let grad = cx.createLinearGradient(0, 0, 0, -800);
+        grad.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        grad.addColorStop(0.5, 'rgba(255, 215, 0, 0.3)');
+        grad.addColorStop(1, 'rgba(138, 43, 226, 0)');
+        
+        cx.strokeStyle = grad;
+        cx.lineWidth = 4;
+        cx.beginPath(); cx.moveTo(0, 100); cx.lineTo(0, -800); cx.stroke();
+        
+        // Cercles d'intersections sacrés
+        cx.beginPath(); cx.arc(0, -300, 10, 0, Math.PI*2); cx.stroke();
+    }
+    
+    // Cercles concentriques parfaits
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.2)'; cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(0, 0, 400, 0, Math.PI*2); cx.stroke();
+    cx.setLineDash([10, 20]);
+    cx.beginPath(); cx.arc(0, 0, 550, 0, Math.PI*2); cx.stroke();
+    cx.setLineDash([]);
+    cx.restore();
+
+    // 2. AILES DE SÉRAPHIN (Géométrie de Lumière)
+    for (let side of [-1, 1]) {
+        for (let i=0; i<4; i++) { 
+            cx.save();
+            // Déploiement des ailes
+            let wingAngle = side * (Math.PI/3 + i*Math.PI/8) + Math.sin(t*1.5 + i)*0.05;
+            cx.rotate(wingAngle);
+            
+            let wingLen = 600 - i*80;
+            let wGrad = cx.createLinearGradient(0, 0, 0, -wingLen);
+            wGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+            wGrad.addColorStop(0.3, 'rgba(255, 215, 0, 0.6)');
+            wGrad.addColorStop(1, 'rgba(138, 43, 226, 0)'); // Finit en violet cosmique
+            
+            cx.fillStyle = wGrad;
+            cx.beginPath(); 
+            cx.moveTo(0, 0); 
+            cx.lineTo(-side * 40, -wingLen * 0.4); 
+            cx.lineTo(0, -wingLen); 
+            cx.lineTo(side * 60, -wingLen * 0.4); 
+            cx.closePath(); 
+            cx.fill();
+            cx.restore();
+        }
+    }
+    cx.globalCompositeOperation = 'source-over';
+
+    // 3. LE CORPS DIVIN (Silhouette d'Anti-Lumière)
+    // C'est un creux dans l'univers, bordé de lumière pure.
+    noGlow();
+    cx.fillStyle = '#000000'; // Vantablack
+    cx.strokeStyle = '#FFFFFF'; 
+    cx.lineWidth = 6;
+    
+    cx.beginPath();
+    cx.moveTo(0, -60); // Cou
+    cx.lineTo(90, -40); // Épaule droite
+    cx.lineTo(130, 20); // Bras
+    cx.lineTo(60, 60); // Coude
+    cx.lineTo(40, 250); // Manteau bas droit
+    cx.lineTo(0, 300); // Pointe centrale basse
+    cx.lineTo(-40, 250); // Manteau bas gauche
+    cx.lineTo(-60, 60); 
+    cx.lineTo(-130, 20); 
+    cx.lineTo(-90, -40); 
+    cx.closePath();
+    cx.fill(); cx.stroke();
+
+    // Mains lévitantes tenant des fragments de matrice
+    const drawDivineHand = (side) => {
+        cx.save();
+        cx.translate(side * 150, 100 + Math.sin(t*2)*10);
+        glow('#FFF', 30);
+        cx.fillStyle = '#000'; cx.strokeStyle = '#FFF'; cx.lineWidth = 4;
+        cx.beginPath(); cx.moveTo(0,-20); cx.lineTo(15,0); cx.lineTo(0,20); cx.lineTo(-15,0); cx.closePath(); cx.fill(); cx.stroke();
+        // Grille brisée dans les mains
+        cx.globalCompositeOperation = 'screen';
+        cx.strokeStyle = 'rgba(138, 43, 226, 0.8)'; cx.lineWidth = 2;
+        cx.rotate(t * side);
+        for(let j=-30; j<=30; j+=15) { cx.beginPath(); cx.moveTo(-30, j); cx.lineTo(30, j); cx.stroke(); cx.beginPath(); cx.moveTo(j, -30); cx.lineTo(j, 30); cx.stroke(); }
+        cx.globalCompositeOperation = 'source-over';
+        cx.restore();
+    };
+    drawDivineHand(1); drawDivineHand(-1);
+
+    // 4. LA TÊTE : LA SINGULARITÉ ABSOLUE (Le Trou Noir Parfait)
+    cx.translate(0, -120); // Position de la tête
+    
+    // Disque d'accrétion (La couronne du trou noir)
+    cx.globalCompositeOperation = 'screen';
+    for(let i=0; i<3; i++) {
+        cx.save(); 
+        cx.rotate(t * 3 + i*(Math.PI/3));
+        glow('#FFD700', 40);
+        cx.strokeStyle = 'rgba(255, 255, 255, 0.9)'; cx.lineWidth = 12;
+        cx.beginPath(); cx.ellipse(0, 0, 160, 40, 0, 0, Math.PI*2); cx.stroke();
+        cx.restore();
+    }
+    cx.globalCompositeOperation = 'source-over';
+
+    // Le Noyau (Event Horizon)
+    glow('#FFF', 60);
+    cx.fillStyle = '#000000';
+    cx.beginPath(); cx.arc(0, 0, 55, 0, Math.PI*2); cx.fill();
+    cx.strokeStyle = '#FFFFFF'; cx.lineWidth = 6; cx.stroke();
+    
+    // L'Oeil de Dieu (Tracking lent et terrifiant)
+    let tX = clamp((mx - cX) * 0.05, -20, 20);
+    let tY = clamp((my - (cY - 120)) * 0.05, -20, 20);
+    eyeTrackX += (tX - eyeTrackX) * 0.05; // Très lent, majestueux
+    eyeTrackY += (tY - eyeTrackY) * 0.05;
+
+    noGlow();
+    cx.fillStyle = '#FFF';
+    cx.beginPath(); cx.arc(eyeTrackX, eyeTrackY, 15, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#000';
+    cx.beginPath(); cx.arc(eyeTrackX, eyeTrackY, 5, 0, Math.PI*2); cx.fill();
+
+    cx.restore(); // Fin Boss
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  BOUCLE PRINCIPALE D'ANIMATION
+// ═════════════════════════════════════════════════════════════════════════════
+function loop(ts) {
+    let dt = ts - lastTime; lastTime = ts; globalT += dt;
+    const t = globalT / 1000;
+
+    cx.fillStyle = '#010002'; cx.fillRect(0, 0, W, H);
+
+    drawCathedralArena(t, currentPhase);
+
+    // Gestions des cendres
+    embers.spawn(currentPhase); embers.spawn(currentPhase);
+    if(currentPhase === 4 || currentPhase === 5) { embers.spawn(currentPhase); embers.spawn(currentPhase); } 
+    if(currentPhase === 6) { embers.spawn(6); embers.spawn(6); } // P6: Aspiration massive
+    embers.updateAndDraw(t, currentPhase);
+
+    // Rendu des Boss selon la phase
+    if (currentPhase < 4) {
+        drawTheSovereign(t, currentPhase);
+    } else if (currentPhase === 4) {
+        drawUltimateVoid(t);
+    } else if (currentPhase === 5) {
+        drawOverloadVoid(t);
+    } else if (currentPhase === 6) {
+        drawGodOfVoid(t);
+    }
+
+    // Vignette / Flashs de pulsation
+    if (currentPhase < 4) {
+        let r = 255, g = 0, b = 60;
+        if(currentPhase === 2) { r = 184; g = 0; b = 138; }
+        if(currentPhase === 3) { r = 138; g = 43; b = 226; }
+        cx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.02 + Math.sin(t*10)*0.01})`;
+        cx.fillRect(0, 0, W, H); 
+    } else if (currentPhase === 4) {
+        cx.fillStyle = `rgba(255, 0, 255, ${0.05 + Math.random()*0.05})`;
+        cx.fillRect(0, 0, W, H);
+    } else if (currentPhase === 5) {
+        cx.fillStyle = Math.random() > 0.5 ? `rgba(255, 215, 0, ${0.1 + Math.random()*0.1})` : `rgba(255, 0, 255, ${0.1 + Math.random()*0.1})`;
+        cx.fillRect(0, 0, W, H);
+    } else if (currentPhase === 6) {
+        // P6: Pulsation divine blanche très douce
+        cx.fillStyle = `rgba(255, 255, 255, ${0.02 + Math.sin(t*2)*0.02})`;
+        cx.fillRect(0, 0, W, H);
+    }
+
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Visualiseur de Transitions</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ─── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#020005;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.25) 50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06));background-size:100% 2px, 3px 100%;opacity:0.6;}
+
+/* ─── INTERFACE ─── */
+#ui-panel {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: rgba(10, 0, 20, 0.85);
+    padding: 15px 30px;
+    border: 2px solid #8A2BE2;
+    border-radius: 8px;
+}
+.btn-group { display: flex; gap: 10px; }
+.btn {
+    padding: 10px 15px; border: 2px solid #555; background: transparent; color: #aaa;
+    cursor: pointer; font-size: 1rem; font-family: 'Orbitron', sans-serif; font-weight: bold; transition: all 0.2s;
+}
+.btn:hover { color: #fff; border-color: #fff; }
+.btn.active { color: #00F5FF; border-color: #00F5FF; background: rgba(0,245,255,0.1); }
+.btn-action { color: #FFD700; border-color: #FFD700; width: 100%; margin-top: 10px; }
+.btn-action:hover { background: rgba(255, 215, 0, 0.2); }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+
+<div id="ui-panel">
+    <div class="btn-group">
+        <button class="btn active" id="btn-1" onclick="setConcept(1)">1. IMPLOSION</button>
+        <button class="btn" id="btn-2" onclick="setConcept(2)">2. COMPILATION</button>
+        <button class="btn" id="btn-3" onclick="setConcept(3)">3. GLITCH FATAL</button>
+    </div>
+    <button class="btn btn-action" onclick="triggerTransition()">▶ LANCER LA TRANSITION</button>
+</div>
+
+<script>
+"use strict";
+
+const cv = document.getElementById('c'), cx = cv.getContext('2d', {alpha: false});
+let W, H, centerX, centerY;
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; centerX = W/2; centerY = H/2; }
+window.addEventListener('resize', resize); resize();
+
+const K = { pur: '#8A2BE2', wh: '#ffffff', bk: '#000000', gold: '#FFD700', red: '#FF003C', blue: '#00F5FF' };
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+const lerp = (a,b,t) => a+(b-a)*t;
+
+let concept = 1;
+function setConcept(c) {
+    concept = c;
+    document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${c}`).classList.add('active');
+    resetState();
+}
+
+// ─── STATE MACHINE ───
+// 0 = Phase 1 (Orbes qui tournent)
+// 1 = Transition en cours
+// 2 = Phase 2 (Monolithe fusionné)
+let state = 0; 
+let transTimer = 0;
+const TRANS_DURATION = 3.0; // 3 secondes de transition
+let particles = [];
+
+function triggerTransition() {
+    if (state !== 0) resetState(); // Si on est déjà en P2, on reset avant de lancer
+    state = 1;
+    transTimer = 0;
+    particles = [];
+    
+    // Si concept 2 (Compilation), on génère des particules de données
+    if (concept === 2) {
+        for(let i=0; i<100; i++) {
+            particles.push({
+                x: centerX + (Math.random()-0.5)*400,
+                y: centerY + (Math.random()-0.5)*400,
+                vx: (Math.random()-0.5)*10,
+                vy: (Math.random()-0.5)*10,
+                c: Math.random() > 0.5 ? K.red : K.blue,
+                size: Math.random() * 4 + 2
+            });
+        }
+    }
+}
+
+function resetState() {
+    state = 0;
+    transTimer = 0;
+}
+
+let tT = 0, lastT = 0;
+
+function draw(ts) {
+    const dt = Math.min(ts - lastT, 50) || 0; 
+    lastT = ts; tT += dt;
+    const t = tT / 1000;
+
+    // Mise à jour du timer de transition
+    if (state === 1) {
+        transTimer += dt / 1000;
+        if (transTimer >= TRANS_DURATION) {
+            state = 2; // Fin de la transition
+            // Retour auto à la phase 1 après 3 secondes pour tester en boucle
+            setTimeout(resetState, 3000); 
+        }
+    }
+
+    // Fond de base
+    cx.fillStyle = '#050011'; 
+    cx.fillRect(0, 0, W, H);
+
+    // Positions de base des orbes
+    const orbDist = 200;
+    const rX_base = centerX + Math.cos(t * 2) * orbDist;
+    const rY_base = centerY + Math.sin(t * 2) * orbDist;
+    const bX_base = centerX + Math.cos(t * 2 + Math.PI) * orbDist;
+    const bY_base = centerY + Math.sin(t * 2 + Math.PI) * orbDist;
+
+    // ═══════════════════════════════════════════════════════════
+    //  ÉTAT 0 : PHASE 1 NORMALE
+    // ═══════════════════════════════════════════════════════════
+    if (state === 0) {
+        drawOrb(rX_base, rY_base, K.red);
+        drawOrb(bX_base, bY_base, K.blue);
+        drawP1Center();
+    } 
+    
+    // ═══════════════════════════════════════════════════════════
+    //  ÉTAT 1 : L'ANIMATION DE TRANSITION
+    // ═══════════════════════════════════════════════════════════
+    else if (state === 1) {
+        const prog = transTimer / TRANS_DURATION; // 0.0 à 1.0
+
+        // ─── CONCEPT 1 : IMPLOSION QUANTIQUE ───
+        if (concept === 1) {
+            // Aspiration vers le centre (ease-in)
+            const pullProg = Math.pow(prog, 3);
+            const curRX = lerp(rX_base, centerX, pullProg);
+            const curRY = lerp(rY_base, centerY, pullProg);
+            const curBX = lerp(bX_base, centerX, pullProg);
+            const curBY = lerp(bY_base, centerY, pullProg);
+
+            // Tremblement de plus en plus fort
+            cx.save();
+            const shake = pullProg * 15;
+            cx.translate((Math.random()-0.5)*shake, (Math.random()-0.5)*shake);
+
+            if (prog < 0.95) {
+                // Liens d'énergie qui se densifient
+                glow(K.pur, 20); cx.strokeStyle = `rgba(138,43,226, ${pullProg})`; cx.lineWidth = pullProg * 10;
+                cx.beginPath(); cx.moveTo(curRX, curRY); cx.lineTo(curBX, curBY); cx.stroke(); noGlow();
+                
+                drawOrb(curRX, curRY, K.red);
+                drawOrb(curBX, curBY, K.blue);
+                drawP1Center(1 - pullProg); // Le centre disparait
+            }
+            cx.restore();
+
+            // Flash final à la collision
+            if (prog > 0.8) {
+                const flashProg = (prog - 0.8) / 0.2;
+                glow('#fff', 50); cx.fillStyle = `rgba(255, 255, 255, ${Math.sin(flashProg * Math.PI)})`;
+                cx.beginPath(); cx.arc(centerX, centerY, flashProg * W, 0, Math.PI*2); cx.fill(); noGlow();
+            }
+        } 
+        
+        // ─── CONCEPT 2 : COMPILATION DE CODE ───
+        else if (concept === 2) {
+            // Ligne de scan vertical
+            const scanY = lerp(0, H, prog);
+            glow('#00F5FF', 20); cx.fillStyle = 'rgba(0,245,255,0.3)'; cx.fillRect(0, scanY-20, W, 40);
+            cx.fillStyle = '#fff'; cx.fillRect(0, scanY-2, W, 4); noGlow();
+
+            // Le décor se désintègre en particules
+            particles.forEach(p => {
+                // Les particules sont aspirées vers le centre à la fin
+                if (prog > 0.4) {
+                    p.x = lerp(p.x, centerX, 0.05);
+                    p.y = lerp(p.y, centerY, 0.05);
+                } else {
+                    p.x += p.vx; p.y += p.vy;
+                }
+                cx.fillStyle = p.c;
+                cx.font = `${p.size*3}px Orbitron`;
+                cx.fillText(Math.random()>0.5?'0':'1', p.x, p.y);
+            });
+
+            // Hologramme en construction du boss Phase 2
+            if (prog > 0.5) {
+                const buildProg = (prog - 0.5) / 0.5;
+                cx.save(); cx.translate(centerX, centerY);
+                cx.globalCompositeOperation = 'screen';
+                cx.strokeStyle = `rgba(138,43,226, ${buildProg})`; cx.lineWidth = 2;
+                cx.beginPath(); cx.moveTo(0, -85*buildProg); cx.lineTo(45*buildProg, 0); cx.lineTo(0, 85*buildProg); cx.lineTo(-45*buildProg, 0); cx.closePath(); cx.stroke();
+                cx.restore();
+            }
+        }
+
+        // ─── CONCEPT 3 : GLITCH FATAL ───
+        else if (concept === 3) {
+            // Le boss bugge sur place
+            const glitchAmount = prog * 40;
+            cx.save();
+            if (Math.random() > 0.2) {
+                // Aberration chromatique manuelle
+                cx.globalCompositeOperation = 'screen';
+                cx.translate((Math.random()-0.5)*glitchAmount, (Math.random()-0.5)*glitchAmount);
+                drawOrb(rX_base, rY_base, K.red);
+                cx.translate((Math.random()-0.5)*glitchAmount, (Math.random()-0.5)*glitchAmount);
+                drawOrb(bX_base, bY_base, K.blue);
+                cx.translate((Math.random()-0.5)*glitchAmount, (Math.random()-0.5)*glitchAmount);
+                drawP1Center(1);
+            }
+            cx.restore();
+
+            // Lignes de pixels morts et bruit blanc
+            if (prog > 0.5) {
+                for(let i=0; i<30; i++) {
+                    cx.fillStyle = Math.random()>0.5 ? '#000' : (Math.random()>0.5?K.red:K.blue);
+                    cx.fillRect(Math.random()*W, Math.random()*H, Math.random()*200, Math.random()*20);
+                }
+            }
+
+            // Écran rouge d'erreur critique à la toute fin
+            if (prog > 0.9) {
+                cx.fillStyle = K.red; cx.fillRect(0,0,W,H);
+                cx.fillStyle = '#fff'; cx.font = '900 60px Orbitron'; cx.textAlign='center';
+                cx.fillText("FATAL KERNEL PANIC", centerX, centerY);
+            }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ÉTAT 2 : PHASE 2 NORMALE (MONOLITHE FUSIONNÉ)
+    // ═══════════════════════════════════════════════════════════
+    else if (state === 2) {
+        cx.save(); cx.translate(centerX, centerY);
+        // Bouclier hexagonal
+        glow(K.pur, 50); cx.fillStyle = `rgba(138,43,226, 0.2)`; cx.strokeStyle = K.pur; cx.lineWidth = 3;
+        cx.beginPath();
+        for(let i=0; i<6; i++) {
+            const a = (i/6)*Math.PI*2 + t;
+            if(i===0) cx.moveTo(Math.cos(a)*120, Math.sin(a)*120); else cx.lineTo(Math.cos(a)*120, Math.sin(a)*120);
+        }
+        cx.closePath(); cx.fill(); cx.stroke();
+        
+        // Monolithe central
+        glow('#000', 30); cx.fillStyle = '#050505'; cx.strokeStyle = (Math.floor(t*10)%2===0)?K.red:K.blue; cx.lineWidth = 5;
+        cx.beginPath(); cx.moveTo(0, -85); cx.lineTo(45, 0); cx.lineTo(0, 85); cx.lineTo(-45, 0); cx.closePath(); cx.fill(); cx.stroke();
+        
+        // Oeil
+        noGlow(); cx.fillStyle = K.pur; cx.beginPath(); cx.ellipse(0, 0, 15, 30, 0, 0, Math.PI*2); cx.fill();
+        cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, 0, 6, 0, Math.PI*2); cx.fill();
+        cx.restore();
+    }
+
+    requestAnimationFrame(draw);
+}
+
+// Helpers de dessin pour le visuel
+function drawOrb(x, y, color) {
+    cx.save(); cx.translate(x, y);
+    glow(color, 30); cx.fillStyle = color; cx.beginPath(); cx.arc(0, 0, 35, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, 0, 12, 0, Math.PI*2); cx.fill();
+    noGlow(); cx.restore();
+}
+
+function drawP1Center(alpha = 1) {
+    if (alpha <= 0) return;
+    cx.save(); cx.translate(centerX, centerY); cx.globalAlpha = alpha;
+    glow(K.pur, 50); cx.fillStyle = `rgba(138,43,226,0.3)`; cx.beginPath(); cx.arc(0,0,100,0,Math.PI*2); cx.fill();
+    glow('#000', 20); cx.fillStyle = '#050010'; cx.beginPath(); cx.arc(0,0,50,0,Math.PI*2); cx.fill();
+    noGlow(); cx.restore();
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

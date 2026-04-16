@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ReveB 2 — PALIER 40 : CHRONOS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --gold: #FFD700;
+      --blue: #0050FF;
+      --cyan: #00F5FF;
+      --bg: #010005;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .12) 50%);
+      background-size: 100% 3px;
+      opacity: .85;
+    }
+
+    #vig {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 35%, rgba(0, 0, 0, .97) 100%);
+    }
+
+    #glitch {
+      position: fixed;
+      inset: 0;
+      z-index: 997;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* Timer display */
+    #timer {
+      position: fixed;
+      top: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 3.5rem;
+      font-weight: 900;
+      letter-spacing: 10px;
+      color: var(--gold);
+      text-shadow: 0 0 30px var(--gold), 0 0 60px rgba(255, 215, 0, .3);
+      opacity: 0;
+      transition: opacity .5s;
+      text-align: center;
+    }
+
+    #timer-sub {
+      font-size: .65rem;
+      letter-spacing: .2em;
+      color: rgba(255, 215, 0, .4);
+      margin-top: 4px;
+    }
+
+    /* Timeline indicator */
+    #timelines {
+      position: fixed;
+      left: 22px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity .5s;
+    }
+
+    .tl-line {
+      font-size: .6rem;
+      letter-spacing: .12em;
+      padding: 4px 10px;
+      border-left: 2px solid rgba(255, 215, 0, .3);
+      color: rgba(255, 215, 0, .4);
+    }
+
+    .tl-line.active {
+      border-color: var(--gold);
+      color: var(--gold);
+      text-shadow: 0 0 10px var(--gold);
+    }
+
+    .tl-line.dead {
+      border-color: rgba(255, 0, 60, .4);
+      color: rgba(255, 0, 60, .4);
+      text-decoration: line-through;
+    }
+
+    /* Dialogue */
+    #dlg {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(620px, 86vw);
+      z-index: 200;
+      border: 1px solid rgba(255, 215, 0, .35);
+      border-left: 3px solid var(--gold);
+      padding: 18px 24px;
+      background: rgba(5, 4, 0, .94);
+      opacity: 0;
+      transition: opacity .35s;
+    }
+
+    #dlg-sp {
+      font-size: .65rem;
+      letter-spacing: .2em;
+      color: var(--gold);
+      margin-bottom: 10px;
+    }
+
+    #dlg-tx {
+      font-size: .82rem;
+      line-height: 2;
+      letter-spacing: .04em;
+      color: rgba(255, 215, 0, .88);
+    }
+
+    /* HUD corners */
+    #hud {
+      position: fixed;
+      inset: 16px;
+      z-index: 100;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity .5s;
+    }
+
+    .hc {
+      position: absolute;
+      font-size: .62rem;
+      letter-spacing: .12em;
+      color: rgba(255, 215, 0, .4);
+      line-height: 1.9;
+    }
+
+    #hc-tl {
+      top: 0;
+      left: 0;
+    }
+
+    #hc-tr {
+      top: 0;
+      right: 0;
+      text-align: right;
+    }
+
+    #hc-bl {
+      bottom: 0;
+      left: 0;
+    }
+
+    #hc-br {
+      bottom: 0;
+      right: 0;
+      text-align: right;
+    }
+
+    /* REVEAL */
+    #reveal {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 1.4s;
+      background: radial-gradient(ellipse at center, rgba(20, 12, 0, .12) 0%, transparent 70%);
+    }
+
+    #r-palier {
+      font-size: .82rem;
+      letter-spacing: 10px;
+      color: rgba(255, 215, 0, .6);
+      margin-bottom: 14px;
+    }
+
+    #r-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(4rem, 12vw, 9rem);
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 12px;
+      text-shadow: 0 0 50px var(--gold), 0 0 120px rgba(255, 215, 0, .4);
+      animation: glT .18s infinite alternate;
+    }
+
+    #r-sub {
+      font-size: 1rem;
+      letter-spacing: 7px;
+      color: rgba(255, 215, 0, .7);
+      margin-top: 12px;
+    }
+
+    #r-quote {
+      font-size: .76rem;
+      color: rgba(255, 215, 0, .45);
+      margin-top: 22px;
+      text-align: center;
+      line-height: 2.1;
+      letter-spacing: 2px;
+      max-width: 520px;
+    }
+
+    @keyframes glT {
+      0% {
+        transform: skew(0);
+      }
+
+      100% {
+        transform: skew(-3deg);
+        text-shadow: 5px 0 var(--blue), -5px 0 var(--gold), 0 0 80px var(--gold);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+  <div id="crt"></div>
+  <div id="vig"></div>
+  <div id="glitch"></div>
+  <div id="timer"><span id="t-val">00:00:00</span>
+    <div id="timer-sub">TIMELINE PRINCIPALE</div>
+  </div>
+  <div id="timelines">
+    <div class="tl-line active" id="tl-0">TIMELINE α — ACTIVE</div>
+    <div class="tl-line" id="tl-1">TIMELINE β — [...]</div>
+    <div class="tl-line" id="tl-2">TIMELINE γ — [...]</div>
+    <div class="tl-line" id="tl-3">TIMELINE δ — [...]</div>
+    <div class="tl-line" id="tl-4">TIMELINE ε — [...]</div>
+  </div>
+  <div id="hud">
+    <div class="hc" id="hc-tl">SECTEUR 40 // NEXUS TEMPOREL<br>DÉRIVE : 0.000ms<br>PARADOXE : STABLE</div>
+    <div class="hc" id="hc-tr">CHRONOS : EN LIGNE<br>BOUCLES ACTIVES : 47<br>DESTIN EN COURS : CALCUL</div>
+    <div class="hc" id="hc-bl">CIBLE : SPARK-Y<br>ANALYSE TEMPORELLE : 100%</div>
+    <div class="hc" id="hc-br">FUTUR DÉTECTÉ : 47 VARIANTES<br>SURVIE : 0 / 47</div>
+  </div>
+  <div id="dlg">
+    <div id="dlg-sp">[ CHRONOS ]</div>
+    <div id="dlg-tx"></div>
+  </div>
+  <div id="reveal">
+    <div id="r-palier">— PALIER 40 —</div>
+    <div id="r-name">CHRONOS</div>
+    <div id="r-sub">MAÎTRE DU TEMPS ET DES TIMELINES</div>
+    <div id="r-quote">"J'ai vu ta mort. 47 fois. Dans 47 timelines différentes.<br>Tu arrives toujours trop tard. Ou
+      trop tôt.<br>Mais jamais... au bon moment."</div>
+  </div>
+  <script>
+    // ── AUDIO ──
+    const au = new (AudioContext || webkitAudioContext)();
+    function tone(f, tp, d, v = .05, t = 0) {
+      const o = au.createOscillator(), g = au.createGain();
+      o.connect(g); g.connect(au.destination);
+      o.type = tp; o.frequency.value = f;
+      g.gain.setValueAtTime(v, au.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.0001, au.currentTime + t + d);
+      o.start(au.currentTime + t); o.stop(au.currentTime + t + d);
+    }
+    function chord(fs, d, v = .04) { fs.forEach((f, i) => tone(f, 'sine', d, v, i * .05)); }
+    const sfx = {
+      tick: () => tone(800, 'square', .04, .06),
+      tock: () => tone(600, 'square', .04, .05),
+      rewind: () => { for (let i = 0; i < 8; i++)tone(300 + i * 80, 'sawtooth', .06, .03, i * .04); },
+      freeze: () => chord([220, 277, 330, 440], .8, .04),
+      crack: () => { tone(100, 'sawtooth', .3, .15); tone(2000, 'square', .1, .08, .05); },
+      boom: () => { tone(50, 'sine', 2, .5); tone(80, 'square', .8, .2, .1); },
+      paradox: () => { chord([440, 466], .4, .06); chord([659, 622], .4, .04, .1); },
+      glitch: () => tone(100 + Math.random() * 600, 'sawtooth', .04, .05),
+      timeline: () => chord([523, 659, 784], .5, .04),
+    };
+
+    // ── CANVAS ──
+    const cv = document.getElementById('c'), cx = cv.getContext('2d');
+    cv.width = innerWidth; cv.height = innerHeight;
+    const W = cv.width, H = cv.height, CX = W / 2, CY = H / 2;
+
+    let cT = 0; // master clock time
+    let handAngle = 0, handSpeed = .015;
+    let frozen = false, rewindPhase = 0;
+    let ghostAlpha = 0, chronosAlpha = 0;
+    let ghostFrames = []; // capture frames for ghost effect
+    let tearCount = 0, tears = [];
+    let phase = 0;
+
+    // Clock draws
+    function drawClock(x, y, R, alpha, tOffset = 0, colorMix = 0) {
+      cx.save(); cx.translate(x, y); cx.globalAlpha = alpha;
+      const goldC = `rgba(255,215,0,`; const blueC = `rgba(0,80,255,`;
+      const mainC = colorMix < .5 ? goldC : blueC;
+
+      // Clock face
+      cx.beginPath(); cx.arc(0, 0, R, 0, Math.PI * 2);
+      cx.strokeStyle = mainC + '.5)'; cx.lineWidth = 2; cx.shadowColor = colorMix < .5 ? '#FFD700' : '#0050FF';
+      cx.shadowBlur = 20; cx.stroke();
+
+      // Glow fill
+      const gr = cx.createRadialGradient(0, 0, 0, 0, 0, R);
+      gr.addColorStop(0, mainC + '.04)'); gr.addColorStop(1, 'transparent');
+      cx.fillStyle = gr; cx.beginPath(); cx.arc(0, 0, R, 0, Math.PI * 2); cx.fill();
+
+      // Roman numerals / tick marks
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 - Math.PI / 2;
+        const isMajor = true;
+        const ri = R * .82, ro = R * .9;
+        cx.beginPath(); cx.moveTo(Math.cos(a) * ri, Math.sin(a) * ri);
+        cx.lineTo(Math.cos(a) * ro, Math.sin(a) * ro);
+        cx.strokeStyle = mainC + '.6)'; cx.lineWidth = isMajor ? 2 : 1; cx.stroke();
+      }
+      for (let i = 0; i < 60; i++) {
+        const a = (i / 60) * Math.PI * 2 - Math.PI / 2;
+        const ri = R * .88, ro = R * .93;
+        cx.beginPath(); cx.moveTo(Math.cos(a) * ri, Math.sin(a) * ri);
+        cx.lineTo(Math.cos(a) * ro, Math.sin(a) * ro);
+        cx.strokeStyle = mainC + '.25)'; cx.lineWidth = .8; cx.stroke();
+      }
+
+      // Hands
+      const ha = handAngle + tOffset - Math.PI / 2;
+      const mha = handAngle * 12 + tOffset - Math.PI / 2; // minutes
+      const sha = handAngle * 720 + tOffset - Math.PI / 2; // seconds
+
+      // Second hand (fast/erratic)
+      cx.beginPath(); cx.moveTo(0, 0);
+      cx.lineTo(Math.cos(sha) * R * .85, Math.sin(sha) * R * .85);
+      cx.strokeStyle = 'rgba(255,0,60,.8)'; cx.lineWidth = 1.5; cx.shadowColor = '#FF003C'; cx.shadowBlur = 8; cx.stroke();
+
+      // Minute hand
+      cx.beginPath(); cx.moveTo(0, 0);
+      cx.lineTo(Math.cos(mha) * R * .7, Math.sin(mha) * R * .7);
+      cx.strokeStyle = mainC + '.8)'; cx.lineWidth = 2.5; cx.shadowColor = colorMix < .5 ? '#FFD700' : '#0050FF'; cx.shadowBlur = 12; cx.stroke();
+
+      // Hour hand
+      cx.beginPath(); cx.moveTo(0, 0);
+      cx.lineTo(Math.cos(ha) * R * .5, Math.sin(ha) * R * .5);
+      cx.strokeStyle = mainC + '1)'; cx.lineWidth = 3.5; cx.shadowBlur = 15; cx.stroke();
+
+      // Center
+      cx.beginPath(); cx.arc(0, 0, 5, 0, Math.PI * 2);
+      cx.fillStyle = mainC + '1)'; cx.fill();
+      cx.shadowBlur = 0; cx.restore();
+    }
+
+    // Time tears/cracks
+    function addTear() {
+      const x = Math.random() * W, y = Math.random() * H;
+      const len = 50 + Math.random() * 150;
+      const a = Math.random() * Math.PI;
+      tears.push({ x, y, len, a, age: 0, maxAge: 80 + Math.random() * 40 });
+    }
+    function drawTears() {
+      tears = tears.filter(t => t.age < t.maxAge);
+      tears.forEach(t => {
+        t.age++;
+        const p = t.age / t.maxAge;
+        const alpha = Math.sin(p * Math.PI) * .7;
+        const currLen = t.len * Math.min(1, t.age / 20);
+        cx.beginPath();
+        cx.moveTo(t.x, t.y);
+        cx.lineTo(t.x + Math.cos(t.a) * currLen, t.y + Math.sin(t.a) * currLen);
+        cx.strokeStyle = `rgba(255,215,0,${alpha})`; cx.lineWidth = 1.5;
+        cx.shadowColor = '#FFD700'; cx.shadowBlur = 8; cx.stroke();
+        // Glow around crack
+        cx.shadowBlur = 0;
+        // Blue edge
+        cx.beginPath();
+        cx.moveTo(t.x + 2, t.y + 2);
+        cx.lineTo(t.x + Math.cos(t.a) * currLen + 2, t.y + Math.sin(t.a) * currLen + 2);
+        cx.strokeStyle = `rgba(0,80,255,${alpha * .5})`; cx.lineWidth = 3; cx.stroke();
+      });
+    }
+
+    // CHRONOS entity (stylized hourglass-body)
+    function drawChronos(alpha) {
+      if (alpha <= 0) return;
+      cx.save(); cx.translate(CX, CY - 40); cx.globalAlpha = alpha;
+      const beat = Math.abs(Math.sin(cT * .04));
+
+      // Outer temporal aura
+      const gr = cx.createRadialGradient(0, 0, 50, 0, 0, 200);
+      gr.addColorStop(0, 'rgba(255,215,0,.06)'); gr.addColorStop(1, 'transparent');
+      cx.fillStyle = gr; cx.beginPath(); cx.arc(0, 0, 200, 0, Math.PI * 2); cx.fill();
+
+      // Hourglass body
+      const pts = [[0, -90], [45, -50], [15, -10], [15, 10], [45, 50], [0, 90], [-45, 50], [-15, 10], [-15, -10], [-45, -50]];
+      cx.beginPath(); pts.forEach(([x, y], i) => i === 0 ? cx.moveTo(x, y) : cx.lineTo(x, y)); cx.closePath();
+      cx.strokeStyle = 'rgba(255,215,0,.65)'; cx.lineWidth = 2; cx.shadowColor = '#FFD700'; cx.shadowBlur = 20; cx.stroke();
+      cx.fillStyle = 'rgba(255,215,0,.04)'; cx.fill();
+
+      // Sand particles
+      for (let i = 0; i < 8; i++) {
+        const yp = -10 + ((cT * 1.5 + i * 30) % 20);
+        const xp = Math.sin(cT * .08 + i) * 8;
+        cx.fillStyle = `rgba(255,215,0,${.4 + beat * .3})`;
+        cx.fillRect(xp - 1, yp - 1, 2, 2);
+      }
+
+      // Crown/head
+      cx.beginPath(); cx.arc(0, -100, 16 + beat * 4, 0, Math.PI * 2);
+      cx.strokeStyle = 'rgba(255,215,0,.7)'; cx.lineWidth = 2; cx.stroke();
+
+      // Eyes (two clocks)
+      [-8, 8].forEach(ex => {
+        cx.beginPath(); cx.arc(ex, -100, 5, 0, Math.PI * 2);
+        cx.strokeStyle = 'rgba(0,80,255,.8)'; cx.lineWidth = 1.2; cx.stroke();
+        // Rotating dot in eye
+        const ea = cT * .08 + (ex > 0 ? 0 : Math.PI);
+        cx.fillStyle = 'rgba(0,80,255,1)';
+        cx.fillRect(ex + Math.cos(ea) * 3 - 1, -100 + Math.sin(ea) * 3 - 1, 2, 2);
+      });
+
+      // Temporal rings orbiting
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + cT * .015 * (i % 2 === 0 ? 1 : -1);
+        const r = 120 + i * 20;
+        cx.save(); cx.translate(Math.cos(a) * r * .3, Math.sin(a) * r * .5);
+        cx.beginPath(); cx.arc(0, 0, 6 - i, 0, Math.PI * 2);
+        cx.strokeStyle = `rgba(255,215,0,${.4 - i * .08})`; cx.lineWidth = 1; cx.stroke();
+        cx.restore();
+      }
+      cx.shadowBlur = 0; cx.restore();
+    }
+
+    // Ghost clock (past/future echoes)
+    function drawGhostClocks(alpha) {
+      if (alpha <= 0) return;
+      const offsets = [{ x: -220, y: -100, s: .45, t: -Math.PI * .3, c: .8 },
+      { x: 230, y: -80, s: .38, t: Math.PI * .5, c: .2 },
+      { x: -180, y: 140, s: .32, t: Math.PI, c: .5 }];
+      offsets.forEach((o, i) => {
+        const a = alpha * (Math.sin(cT * .03 + i) * .2 + .4);
+        drawClock(CX + o.x, CY + o.y, 100 * o.s, a, o.t, o.c);
+      });
+    }
+
+    // Background grid with time warp
+    function drawGrid() {
+      const warp = rewindPhase * .15;
+      cx.strokeStyle = 'rgba(255,215,0,.018)'; cx.lineWidth = .5;
+      for (let x = 0; x < W; x += 55) {
+        const yOff = Math.sin(x * .01 + cT * .02) * warp * 30;
+        cx.beginPath(); cx.moveTo(x, yOff); cx.lineTo(x, H + yOff); cx.stroke();
+      }
+      cx.strokeStyle = 'rgba(0,80,255,.012)';
+      for (let y = 0; y < H; y += 55) {
+        const xOff = Math.sin(y * .01 + cT * .02) * warp * 30;
+        cx.beginPath(); cx.moveTo(xOff, y); cx.lineTo(W + xOff, y); cx.stroke();
+      }
+    }
+
+    // Timer display
+    let timerRunning = true, timerS = 0;
+    function updateTimer() {
+      if (!timerRunning) return;
+      timerS += 1 / 60;
+      if (rewindPhase > 0) timerS = Math.max(0, timerS - rewindPhase * 3 / 60);
+      const h = Math.floor(timerS / 3600), m = Math.floor(timerS / 60) % 60, s = Math.floor(timerS) % 60;
+      document.getElementById('t-val').textContent =
+        `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    const rng = (a, b) => Math.random() * (b - a) + a;
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+
+    function render() {
+      cx.fillStyle = 'rgba(1,0,5,.1)'; cx.fillRect(0, 0, W, H);
+      drawGrid();
+      if (phase >= 2) drawGhostClocks(ghostAlpha);
+      drawClock(CX, CY - 20, 160, 1, 0, 0);
+      drawTears();
+      if (phase >= 3) drawChronos(chronosAlpha);
+      updateTimer();
+      if (!frozen) handAngle += handSpeed;
+      cT++;
+      requestAnimationFrame(render);
+    }
+
+    // Tick loop
+    let tickCount = 0;
+    function scheduleTick() {
+      setTimeout(() => {
+        if (tickCount % 2 === 0) sfx.tick(); else sfx.tock();
+        tickCount++; scheduleTick();
+      }, 500);
+    }
+
+    function say(txt, delay = 200) {
+      return new Promise(async r => {
+        await wait(delay);
+        const el = document.getElementById('dlg');
+        const tx = document.getElementById('dlg-tx');
+        el.style.opacity = '1'; tx.textContent = '';
+        for (const ch of txt) { tx.textContent += ch; await wait(20 + Math.random() * 12); }
+        r();
+      });
+    }
+    function clearDlg() { document.getElementById('dlg').style.opacity = '0'; return wait(400); }
+
+    async function run() {
+      document.addEventListener('click', () => au.resume(), { once: true });
+      au.resume(); render();
+      await wait(400);
+
+      // Phase 1: Clock ticking, world intro
+      phase = 1; scheduleTick();
+      document.getElementById('hud').style.opacity = '1';
+      document.getElementById('timer').style.opacity = '1';
+      document.getElementById('timelines').style.opacity = '1';
+      await wait(1200);
+
+      sfx.freeze();
+      await say("Tu as mis 40 paliers à arriver ici.", 600);
+      await wait(2000); await clearDlg();
+
+      await say("Pour moi... c'était une seconde.", 400);
+      sfx.tick(); await wait(2000); await clearDlg();
+
+      // Phase 2: Timeline reveal
+      phase = 2; ghostAlpha = .6; handSpeed = .035; sfx.paradox();
+      document.getElementById('tl-1').className = 'tl-line active';
+      document.getElementById('tl-1').textContent = 'TIMELINE β — SPARK-Y MORT (P12)';
+      await wait(400);
+      document.getElementById('tl-2').className = 'tl-line dead';
+      document.getElementById('tl-2').textContent = 'TIMELINE γ — SPARK-Y MORT (P28)';
+      await wait(400);
+      document.getElementById('tl-3').className = 'tl-line dead';
+      document.getElementById('tl-3').textContent = 'TIMELINE δ — SPARK-Y MORT (P40)';
+      await wait(400);
+      document.getElementById('tl-4').className = 'tl-line dead';
+      document.getElementById('tl-4').textContent = 'TIMELINE ε — SPARK-Y MORT (P40)';
+
+      document.getElementById('hc-br').textContent = 'FUTUR DÉTECTÉ : 47 VARIANTES\nSURVIE : 0 / 47';
+
+      await wait(600);
+      await say("J'ai calculé 47 versions de ce moment.\nDans 47 timelines.", 300);
+      sfx.timeline(); await wait(2400); await clearDlg();
+
+      await say("Dans chacune... tu arrives ici.\nDans chacune... tu perds.", 200);
+      sfx.crack(); if (tearCount < 5) { addTear(); tearCount++; }
+      await wait(2200); await clearDlg();
+
+      // Rewind effect
+      handSpeed = -.08; rewindPhase = 1; sfx.rewind();
+      for (let i = 0; i < 6; i++) {
+        document.body.style.transform = `translate(${rng(-5, 5)}px,${rng(-3, 3)}px) scaleX(${rng(.97, 1.03)})`;
+        sfx.glitch(); addTear(); await wait(100);
+      }
+      document.body.style.transform = ''; handSpeed = .015; rewindPhase = 0;
+
+      await say("Le temps ne t'est pas favorable, SPARK-Y.\nIl ne l'a JAMAIS été.", 200);
+      sfx.freeze(); await wait(2000); await clearDlg();
+
+      // Phase 3: CHRONOS appears
+      phase = 3; handSpeed = .06;
+      const cInterval = setInterval(() => { chronosAlpha = Math.min(1, chronosAlpha + .015); if (chronosAlpha >= 1) clearInterval(cInterval); }, 30);
+      sfx.boom();
+
+      // Time freeze
+      frozen = true; timerRunning = false;
+      const glitch = document.getElementById('glitch');
+      for (let i = 0; i < 8; i++) {
+        glitch.style.background = 'rgba(255,215,0,.2)'; glitch.style.display = 'block';
+        sfx.glitch(); await wait(80);
+        glitch.style.display = 'none'; await wait(60);
+      }
+      frozen = false; timerRunning = true; handSpeed = .04;
+
+      await wait(600);
+      await say("Je suis CHRONOS.\nLe temps n'est pas une ressource... C'est MON territoire.", 200);
+      sfx.paradox(); await wait(2600); await clearDlg();
+
+      for (let i = 0; i < 4; i++) { addTear(); }
+      sfx.crack(); sfx.boom();
+
+      await say("Et dans toutes les timelines où tu arrives ici...\n...aucune n'a de fin heureuse.", 100);
+      await wait(2800); await clearDlg();
+
+      // Final freeze + reveal
+      for (let i = 0; i < 12; i++) {
+        frozen = i % 2 === 0;
+        document.body.style.transform = frozen ? `translate(${rng(-10, 10)}px,${rng(-5, 5)}px)` : '';
+        sfx.glitch(); await wait(80);
+      }
+      frozen = false; document.body.style.transform = '';
+      handSpeed = .001; timerRunning = false;
+
+      phase = 4;
+      document.getElementById('dlg').style.opacity = '0';
+      document.getElementById('hud').style.opacity = '0';
+      document.getElementById('timer').style.opacity = '0';
+      document.getElementById('timelines').style.opacity = '0';
+      sfx.boom(); sfx.freeze();
+
+      await wait(700);
+      const rev = document.getElementById('reveal');
+      rev.style.opacity = '1'; sfx.boom();
+
+      await wait(4500);
+      document.body.style.transition = 'opacity 1.2s'; document.body.style.opacity = '0';
+      await wait(1300);
+      window.location.href = '../boss40.html';
+    }
+    run();
+  </script>
+</body>
+
+</html>

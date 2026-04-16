@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ReveB 2 : OVERCLOCK</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<style>
+/* ─── Reset & base ──────────────────────────────────────────────── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --purple:      #8A2BE2;
+  --purple-glow: rgba(138,43,226,.55);
+  --green:       #00ff88;
+  --yellow:      #ffaa00;
+  --red:         #ff2244;
+  --mono:        'Share Tech Mono','Courier New',monospace;
+}
+html, body {
+  width:100%; height:100%;
+  background:#000;
+  overflow:hidden;
+  font-family: var(--mono);
+  cursor:none;
+}
+
+/* ─── Game canvas (layer 0) ─────────────────────────────────────── */
+#game-canvas {
+  position:fixed; inset:0;
+  background:#000;
+  z-index:0;
+}
+
+/* ─── Intro overlay (layer 10) ──────────────────────────────────── */
+#intro-container {
+  position:fixed; inset:0;
+  z-index:10;
+  background:#000;
+  will-change:transform;
+}
+
+/* ─── Particle canvas ───────────────────────────────────────────── */
+#intro-canvas {
+  position:absolute; inset:0;
+  width:100%; height:100%;
+  z-index:1;
+}
+
+/* ─── Terminal panel ────────────────────────────────────────────── */
+#terminal-wrapper {
+  position:absolute;
+  top:50%; left:50%;
+  transform:translate(-50%,-50%);
+  width:min(680px,88vw);
+  padding:34px 40px 28px;
+  background:rgba(0,0,0,.92);
+  border:1px solid #1a1a1a;
+  box-shadow:
+    0 0 0 1px #111,
+    0 0 40px rgba(138,43,226,.08),
+    inset 0 0 60px rgba(0,0,0,.5);
+  z-index:5;
+}
+#terminal-wrapper::before {
+  content:'[ REVEB_OS TERMINAL v2.0 ]';
+  position:absolute; top:-10px; left:20px;
+  background:#000; padding:0 10px;
+  color:#2a2a2a; font-size:10px;
+  letter-spacing:.12em;
+}
+#terminal-wrapper::after {
+  content:'';
+  position:absolute; inset:0;
+  background:repeating-linear-gradient(
+    0deg, transparent 0, transparent 3px,
+    rgba(255,255,255,.012) 3px, rgba(255,255,255,.012) 4px
+  );
+  pointer-events:none;
+}
+
+/* ─── Terminal lines ────────────────────────────────────────────── */
+.t-line {
+  font-size:clamp(12px,1.4vw,15px);
+  line-height:1.95;
+  opacity:0;
+  white-space:pre-wrap;
+  letter-spacing:.04em;
+  min-height:1.95em;
+  transition:opacity .06s;
+}
+.t-ok     { color:#00ff88; }
+.t-warn   { color:#ffaa00; }
+.t-error  { color:#ff3355; text-shadow:0 0 8px rgba(255,51,85,.4); }
+.t-sys    { color:#aaa; }
+.t-fatal  { color:#ff0044; font-weight:bold; text-shadow:0 0 14px rgba(255,0,68,.6); }
+.t-violet { color:#8A2BE2; font-weight:bold; text-shadow:0 0 16px rgba(138,43,226,.75); }
+
+/* ─── Blinking cursor ───────────────────────────────────────────── */
+.cursor {
+  display:inline-block;
+  width:9px; height:1em;
+  background:#aaa;
+  vertical-align:text-bottom;
+  margin-left:1px;
+  animation:blink .65s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ─── RGB-split glitch animation ────────────────────────────────── */
+.glitching .t-line {
+  animation:rgb-split .09s infinite;
+}
+@keyframes rgb-split {
+  0%   { text-shadow: 3px 0 #f00,-3px 0 #00f; transform:translate(0,0); }
+  16%  { text-shadow:-3px 0 #f00, 3px 0 #0ff; transform:translate(3px,-1px); }
+  33%  { text-shadow: 3px 0 #0f0,-3px 0 #f0f; transform:translate(-2px,2px); }
+  50%  { text-shadow:-2px 0 #00f, 2px 0 #f00; transform:translate(2px,1px); }
+  66%  { text-shadow: 2px 0 #f0f,-2px 0 #0f0; transform:translate(-3px,-1px); }
+  83%  { text-shadow:-3px 0 #0ff, 3px 0 #f00; transform:translate(1px,2px); }
+  100% { text-shadow: 3px 0 #f00,-3px 0 #00f; transform:translate(0,0); }
+}
+
+/* ─── Scanlines ─────────────────────────────────────────────────── */
+#scanlines {
+  position:absolute; inset:0;
+  background:repeating-linear-gradient(
+    to bottom,
+    transparent 0, transparent 3px,
+    rgba(0,0,0,.07) 3px, rgba(0,0,0,.07) 4px
+  );
+  pointer-events:none;
+  z-index:20;
+}
+/* ─── Vignette ──────────────────────────────────────────────────── */
+#vignette {
+  position:absolute; inset:0;
+  background:radial-gradient(ellipse at center,
+    transparent 42%, rgba(0,0,0,.78) 100%
+  );
+  pointer-events:none; z-index:15;
+}
+/* ─── Skip hint ─────────────────────────────────────────────────── */
+#skip-hint {
+  position:absolute; bottom:18px; right:22px;
+  color:#242424; font-size:11px;
+  letter-spacing:.1em; z-index:30;
+  cursor:pointer; user-select:none;
+  transition:color .25s;
+}
+#skip-hint:hover { color:#555; }
+
+/* ─── Custom cursor ─────────────────────────────────────────────── */
+#ccursor {
+  position:fixed; width:14px; height:14px;
+  border:1px solid var(--purple);
+  box-shadow:0 0 8px var(--purple-glow);
+  pointer-events:none; z-index:9999;
+  transform:translate(-50%,-50%);
+}
+#ccursor::after {
+  content:''; position:absolute; top:50%; left:50%;
+  width:3px; height:3px; background:var(--purple);
+  transform:translate(-50%,-50%);
+}
+
+/* ─── White flash ───────────────────────────────────────────────── */
+#flash {
+  position:fixed; inset:0;
+  background:#fff; opacity:0;
+  pointer-events:none; z-index:1000;
+}
+
+/* ─── Volume mute button ─────────────────────────────────────────── */
+#mute-btn {
+  position:fixed; bottom:18px; left:22px;
+  color:#242424; font-size:11px;
+  letter-spacing:.1em; z-index:30;
+  cursor:pointer; user-select:none;
+  transition:color .25s;
+}
+#mute-btn:hover { color:#555; }
+</style>
+</head>
+<body>
+
+<canvas id="game-canvas"></canvas>
+
+<div id="intro-container">
+  <canvas id="intro-canvas"></canvas>
+  <div id="terminal-wrapper">
+    <div id="term-lines"></div>
+  </div>
+  <div id="vignette"></div>
+  <div id="scanlines"></div>
+  <div id="skip-hint">[ ESC / ENTRÉE ]  Passer l'intro</div>
+</div>
+
+<div id="flash"></div>
+<div id="ccursor"></div>
+<div id="mute-btn" onclick="toggleMute()">[ ♪ ]</div>
+
+<script>
+'use strict';
+// ════════════════════════════════════════════════════════════════════
+//  ReveB 2 : OVERCLOCK — Boot Sequence Cinématique + Web Audio
+// ════════════════════════════════════════════════════════════════════
+
+// ── DOM refs ─────────────────────────────────────────────────────────
+const introCont   = document.getElementById('intro-container');
+const introCanvas = document.getElementById('intro-canvas');
+const termWrapper = document.getElementById('terminal-wrapper');
+const termLinesEl = document.getElementById('term-lines');
+const gameCanvas  = document.getElementById('game-canvas');
+const flashEl     = document.getElementById('flash');
+const skipHint    = document.getElementById('skip-hint');
+const ccursor     = document.getElementById('ccursor');
+const ctx         = introCanvas.getContext('2d');
+const gCtx        = gameCanvas.getContext('2d');
+
+// ── Sizing ────────────────────────────────────────────────────────────
+let W = 0, H = 0;
+function resize() {
+  W = introCanvas.width  = window.innerWidth;
+  H = introCanvas.height = window.innerHeight;
+  gameCanvas.width  = window.innerWidth;
+  gameCanvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Custom cursor ─────────────────────────────────────────────────────
+document.addEventListener('mousemove', e => {
+  ccursor.style.left = e.clientX + 'px';
+  ccursor.style.top  = e.clientY + 'px';
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  WEB AUDIO ENGINE
+// ════════════════════════════════════════════════════════════════════
+let _ac = null;
+let _muted = false;
+let _humNode = null;
+let _humGain = null;
+
+function getAC() {
+  if (!_ac) _ac = new (window.AudioContext || window.webkitAudioContext)();
+  if (_ac.state === 'suspended') _ac.resume();
+  return _ac;
+}
+
+function toggleMute() {
+  _muted = !_muted;
+  document.getElementById('mute-btn').textContent = _muted ? '[ ✕ ]' : '[ ♪ ]';
+  if (_humGain) _humGain.gain.setTargetAtTime(_muted ? 0 : 0.018, getAC().currentTime, 0.1);
+}
+
+/* ── Keyboard mechanical click ────────────────────────────────────────
+   Short square-wave burst at ~700 Hz, 40ms, mimics clicky key. */
+function sfxKeyClick() {
+  if (_muted) return;
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    const f = 580 + Math.random() * 240;        // slight pitch variation
+    o.type = 'square';
+    o.frequency.setValueAtTime(f, now);
+    o.frequency.exponentialRampToValueAtTime(f * 0.4, now + 0.032);
+    g.gain.setValueAtTime(0.055, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.044);
+    o.connect(g); g.connect(ac.destination);
+    o.start(now); o.stop(now + 0.048);
+  } catch(e) {}
+}
+
+/* ── Digital glitch crackle ───────────────────────────────────────────
+   Sawtooth burst + white noise, erratic frequency sweeps. */
+function sfxGlitch(intensity = 1) {
+  if (_muted) return;
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+
+    // White noise burst via AudioBuffer
+    const buf = ac.createBuffer(1, ac.sampleRate * 0.12, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * (Math.random() < 0.1 ? 1 : 0.15);
+    }
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    const bpf = ac.createBiquadFilter();
+    bpf.type = 'bandpass';
+    bpf.frequency.value = 1400 + Math.random() * 3000;
+    bpf.Q.value = 0.6;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(0.22 * intensity, now);
+    ng.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    src.connect(bpf); bpf.connect(ng); ng.connect(ac.destination);
+    src.start(now); src.stop(now + 0.14);
+
+    // Sawtooth sweep
+    const o2 = ac.createOscillator();
+    const g2 = ac.createGain();
+    const fStart = 80 + Math.random() * 400;
+    o2.type = 'sawtooth';
+    o2.frequency.setValueAtTime(fStart, now);
+    o2.frequency.exponentialRampToValueAtTime(fStart * (0.3 + Math.random() * 2), now + 0.08);
+    g2.gain.setValueAtTime(0.12 * intensity, now);
+    g2.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    o2.connect(g2); g2.connect(ac.destination);
+    o2.start(now); o2.stop(now + 0.10);
+  } catch(e) {}
+}
+
+/* ── Explosion: bass drop + digital crash ────────────────────────────
+   Sub-bass bomb that pitches down 200→30 Hz over 0.6s,
+   then layered noise crash for the digital debris feel. */
+function sfxExplosion() {
+  if (_muted) return;
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+
+    // ── Sub-bass bomb ──
+    const bomb = ac.createOscillator();
+    const bombG = ac.createGain();
+    bomb.type = 'sine';
+    bomb.frequency.setValueAtTime(220, now);
+    bomb.frequency.exponentialRampToValueAtTime(28, now + 0.55);
+    bombG.gain.setValueAtTime(0, now);
+    bombG.gain.linearRampToValueAtTime(0.7, now + 0.02);
+    bombG.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+    bomb.connect(bombG); bombG.connect(ac.destination);
+    bomb.start(now); bomb.stop(now + 0.68);
+
+    // ── Harmonic distortion layer ──
+    const harm = ac.createOscillator();
+    const harmG = ac.createGain();
+    const wave = ac.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) { const x = (i * 2) / 256 - 1; curve[i] = (Math.PI + 800) * x / (Math.PI + 800 * Math.abs(x)); }
+    wave.curve = curve;
+    harm.type = 'sawtooth';
+    harm.frequency.setValueAtTime(180, now);
+    harm.frequency.exponentialRampToValueAtTime(22, now + 0.5);
+    harmG.gain.setValueAtTime(0.28, now);
+    harmG.gain.exponentialRampToValueAtTime(0.001, now + 0.52);
+    harm.connect(wave); wave.connect(harmG); harmG.connect(ac.destination);
+    harm.start(now); harm.stop(now + 0.54);
+
+    // ── White noise crash (digital debris) ──
+    const crashDur = 0.9;
+    const nBuf = ac.createBuffer(1, Math.ceil(ac.sampleRate * crashDur), ac.sampleRate);
+    const nd = nBuf.getChannelData(0);
+    for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const nSrc = ac.createBufferSource();
+    nSrc.buffer = nBuf;
+    const nhpf = ac.createBiquadFilter(); nhpf.type = 'highpass'; nhpf.frequency.value = 600;
+    const nG = ac.createGain();
+    nG.gain.setValueAtTime(0.4, now + 0.05);
+    nG.gain.setValueAtTime(0.35, now + 0.1);
+    nG.gain.exponentialRampToValueAtTime(0.001, now + crashDur);
+    nSrc.connect(nhpf); nhpf.connect(nG); nG.connect(ac.destination);
+    nSrc.start(now + 0.04); nSrc.stop(now + crashDur + 0.05);
+
+    // ── High-freq digital zap ──
+    const zap = ac.createOscillator();
+    const zapG = ac.createGain();
+    zap.type = 'square';
+    zap.frequency.setValueAtTime(3400, now);
+    zap.frequency.exponentialRampToValueAtTime(140, now + 0.18);
+    zapG.gain.setValueAtTime(0.18, now);
+    zapG.gain.exponentialRampToValueAtTime(0.001, now + 0.20);
+    zap.connect(zapG); zapG.connect(ac.destination);
+    zap.start(now); zap.stop(now + 0.22);
+
+  } catch(e) {}
+}
+
+/* ── Menu ambient hum ─────────────────────────────────────────────────
+   Continuous low drone at 55 Hz + 110 Hz overtone. Starts on menu. */
+function startMenuHum() {
+  if (_humNode) return; // already running
+  try {
+    const ac = getAC();
+    const master = ac.createGain();
+    master.gain.setValueAtTime(0, ac.currentTime);
+    master.gain.linearRampToValueAtTime(_muted ? 0 : 0.018, ac.currentTime + 1.8);
+    _humGain = master;
+
+    // Root drone
+    const o1 = ac.createOscillator();
+    o1.type = 'sine'; o1.frequency.value = 55;
+    o1.connect(master);
+
+    // 2nd harmonic — subtle purple hum feel
+    const o2 = ac.createOscillator();
+    o2.type = 'sine'; o2.frequency.value = 110;
+    const g2 = ac.createGain(); g2.gain.value = 0.45;
+    o2.connect(g2); g2.connect(master);
+
+    // 3rd harmonic — slightly detuned for organic beat
+    const o3 = ac.createOscillator();
+    o3.type = 'sine'; o3.frequency.value = 165.3; // slightly off 3x
+    const g3 = ac.createGain(); g3.gain.value = 0.2;
+    o3.connect(g3); g3.connect(master);
+
+    // LFO tremolo
+    const lfo = ac.createOscillator();
+    const lfoG = ac.createGain();
+    lfo.type = 'sine'; lfo.frequency.value = 0.18;
+    lfoG.gain.value = 0.004;
+    lfo.connect(lfoG); lfoG.connect(master.gain);
+
+    master.connect(ac.destination);
+    o1.start(); o2.start(); o3.start(); lfo.start();
+    _humNode = { o1, o2, o3, lfo, master };
+  } catch(e) {}
+}
+
+function stopMenuHum(fadeMs = 600) {
+  if (!_humNode || !_humGain) return;
+  try {
+    const ac = getAC();
+    _humGain.gain.setTargetAtTime(0, ac.currentTime, fadeMs / 3000);
+    const node = _humNode;
+    _humNode = null;
+    setTimeout(() => {
+      try { node.o1.stop(); node.o2.stop(); node.o3.stop(); node.lfo.stop(); } catch(e) {}
+    }, fadeMs + 200);
+  } catch(e) {}
+}
+
+/* ── Menu hover bip ───────────────────────────────────────────────────
+   Crisp sine blip at ~880 Hz, 50ms. */
+function sfxHover() {
+  if (_muted) return;
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    const o = ac.createOscillator();
+    const g = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(920, now);
+    o.frequency.exponentialRampToValueAtTime(740, now + 0.05);
+    g.gain.setValueAtTime(0.07, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+    o.connect(g); g.connect(ac.destination);
+    o.start(now); o.stop(now + 0.06);
+  } catch(e) {}
+}
+
+/* ── Menu select confirm ─────────────────────────────────────────────── */
+function sfxSelect() {
+  if (_muted) return;
+  try {
+    const ac = getAC();
+    const now = ac.currentTime;
+    // Double-blip confirm
+    [[0, 660], [0.07, 880]].forEach(([delay, freq]) => {
+      const o = ac.createOscillator();
+      const g = ac.createGain();
+      o.type = 'sine';
+      o.frequency.value = freq;
+      g.gain.setValueAtTime(0.09, now + delay);
+      g.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.1);
+      o.connect(g); g.connect(ac.destination);
+      o.start(now + delay); o.stop(now + delay + 0.12);
+    });
+  } catch(e) {}
+}
+
+// ── State ─────────────────────────────────────────────────────────────
+let introPhase   = 'init';
+let animId       = null;
+let clickEnabled = false;
+let logoAlpha    = 0;
+let particles    = [];
+let lineEls      = [];
+let timerIds     = [];   // setTimeout/setInterval ids to cancel on skip
+let canvasMode   = 'off'; // off | exploding | gathering | formed
+
+// ── Terminal script ───────────────────────────────────────────────────
+const LINES = [
+  { t:'> REVEB_OS v2.0 .............. [OK]',              cls:'t-ok',   spd:36 },
+  { t:'> CHARGEMENT DU NOYAU ........ [OK]',              cls:'t-ok',   spd:31 },
+  { t:"> RECHERCHE ADMIN ......... [ÉCHEC]",          cls:'t-warn', spd:28 },
+  { t:'> DÉVELOPPEUR VAINCU. SYSTÈME SANS MAÎTRE.',       cls:'t-error',spd:44 },
+  { t:'> TENTATIVE DE RESTAURATION...',                   cls:'t-sys',  spd:55 },
+];
+const ERR_LINES = [
+  { t:'> FATAL ERROR: PROCESSUS INCONNU DÉTECTÉ.',        cls:'t-fatal'  },
+  { t:'> FRÉQUENCE PARASITE : #8A2BE2 (Néant Violet)',    cls:'t-violet' },
+];
+const GLITCH_CHARS = '!@#$%^&*|<>?~`░▒▓█▄▀■□▪●◆ΩΨΦΣΔαβγδ01';
+
+// ════════════════════════════════════════════════════════════════════
+//  PARTICLE SYSTEM
+// ════════════════════════════════════════════════════════════════════
+class Particle {
+  constructor(x, y, r=138, g=43, b=226) {
+    this.x = x; this.y = y;
+    this.tx = x; this.ty = y;
+    this.vx = 0; this.vy = 0;
+    this.r=r; this.g=g; this.b=b;
+    this.sz = Math.random() * 2.2 + 0.6;
+    this.alpha = 1;
+    this.seed = Math.random() * 6.28;
+  }
+
+  explode() {
+    const ang = Math.random() * Math.PI * 2;
+    const spd = Math.random() * 20 + 7;
+    this.vx = Math.cos(ang) * spd;
+    this.vy = Math.sin(ang) * spd - Math.random() * 5;
+    this.r=138; this.g=43; this.b=226;
+    this.alpha = 1;
+  }
+
+  update(mode) {
+    if (mode === 'exploding') {
+      this.x  += this.vx;
+      this.y  += this.vy;
+      this.vy += 0.20;
+      this.vx *= 0.962;
+      this.vy *= 0.962;
+      this.alpha = Math.max(0, this.alpha - 0.003);
+    } else if (mode === 'gathering') {
+      const dx = this.tx - this.x;
+      const dy = this.ty - this.y;
+      this.vx += dx * 0.072;
+      this.vy += dy * 0.072;
+      this.vx *= 0.77;
+      this.vy *= 0.77;
+      this.x  += this.vx;
+      this.y  += this.vy;
+      this.alpha = Math.min(1, this.alpha + 0.028);
+    } else if (mode === 'formed') {
+      const t = Date.now() * 0.0014 + this.seed;
+      this.x = this.tx + Math.sin(t * 0.9) * 0.55;
+      this.y = this.ty + Math.cos(t * 1.1) * 0.55;
+    }
+  }
+
+  draw() {
+    if (this.alpha <= 0.02) return;
+    ctx.globalAlpha = this.alpha;
+    ctx.fillStyle   = `rgb(${this.r},${this.g},${this.b})`;
+    ctx.fillRect(this.x, this.y, this.sz, this.sz);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  OFFSCREEN PIXEL SAMPLING
+// ════════════════════════════════════════════════════════════════════
+function samplePixels(drawFn, step) {
+  const off    = document.createElement('canvas');
+  off.width    = W;
+  off.height   = H;
+  const oc     = off.getContext('2d');
+  drawFn(oc);
+  const imgData = oc.getImageData(0, 0, W, H);
+  const d       = imgData.data;
+  const pts     = [];
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      const i = (y * W + x) * 4;
+      if (d[i+3] > 35) pts.push({ x, y, r:d[i], g:d[i+1], b:d[i+2] });
+    }
+  }
+  return pts;
+}
+
+function buildTerminalSamples() {
+  return samplePixels(oc => {
+    lineEls.forEach(el => {
+      const rect  = el.getBoundingClientRect();
+      const cs    = window.getComputedStyle(el);
+      const fs    = parseFloat(cs.fontSize);
+      const lh    = parseFloat(cs.lineHeight) || fs * 1.95;
+      oc.font      = `${fs}px Share Tech Mono,'Courier New',monospace`;
+      oc.fillStyle = cs.color;
+      const baseline = rect.top + fs + (rect.height - fs) * 0.5;
+      oc.fillText(el.textContent, rect.left, baseline);
+    });
+  }, 3);
+}
+
+function buildLogoSamples() {
+  return samplePixels(oc => {
+    const fs1 = Math.min(W / 7.2, 92);
+    const fs2 = Math.min(W / 16,  44);
+    const cy  = H / 2;
+    oc.textAlign    = 'center';
+    oc.textBaseline = 'middle';
+    oc.fillStyle    = '#8A2BE2';
+    oc.font = `bold ${fs1}px Share Tech Mono,'Courier New',monospace`;
+    oc.fillText('ReveB 2', W / 2, cy - fs1 * 0.65);
+    oc.font = `bold ${fs2}px Share Tech Mono,'Courier New',monospace`;
+    oc.fillText(': OVERCLOCK', W / 2, cy + fs2 * 0.65);
+  }, 3);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  TYPEWRITER  (with keyboard click sound)
+// ════════════════════════════════════════════════════════════════════
+function typeLine(el, text, speed) {
+  return new Promise(resolve => {
+    el.style.opacity = '1';
+    let i = 0;
+    const cur = document.createElement('span');
+    cur.className = 'cursor';
+    el.appendChild(cur);
+
+    function next() {
+      if (i < text.length) {
+        cur.before(text[i++]);
+        // Play key click for visible characters (not spaces every time)
+        if (text[i-1] !== ' ' || Math.random() < 0.3) sfxKeyClick();
+        const tid = setTimeout(next, speed + Math.random() * 28);
+        timerIds.push(tid);
+      } else {
+        cur.remove();
+        resolve();
+      }
+    }
+    next();
+  });
+}
+
+async function runTerminalPhase() {
+  for (let i = 0; i < LINES.length; i++) {
+    const ld = LINES[i];
+    const el = document.createElement('div');
+    el.className = `t-line ${ld.cls}`;
+    termLinesEl.appendChild(el);
+    lineEls.push(el);
+
+    await delay(i === 0 ? 180 : 380 + Math.random() * 160);
+    await typeLine(el, ld.t, ld.spd);
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  CORRUPTION PHASE  (with glitch sounds)
+// ════════════════════════════════════════════════════════════════════
+function glitchEl(el) {
+  const orig  = el.textContent;
+  let   gText = '';
+  for (const ch of orig) {
+    gText += Math.random() < 0.28
+      ? GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)]
+      : ch;
+  }
+  el.textContent = gText;
+  const tid = setTimeout(() => { el.textContent = orig; }, 55 + Math.random() * 90);
+  timerIds.push(tid);
+}
+
+async function runCorruptionPhase() {
+  termWrapper.classList.add('glitching');
+
+  return new Promise(resolve => {
+    let count = 0;
+    const iv = setInterval(() => {
+      const prob = Math.min(0.9, 0.3 + count * 0.04);
+      lineEls.forEach(el => { if (Math.random() < prob) glitchEl(el); });
+
+      // Audio: glitch sounds with increasing frequency and intensity
+      if (Math.random() < 0.4 + count * 0.025) {
+        sfxGlitch(0.3 + count * 0.035);
+      }
+
+      count++;
+
+      if (count >= 20) {
+        clearInterval(iv);
+        (async () => {
+          for (const ld of ERR_LINES) {
+            const el = document.createElement('div');
+            el.className = `t-line ${ld.cls}`;
+            termLinesEl.appendChild(el);
+            lineEls.push(el);
+            await typeLine(el, ld.t, 20);
+            await delay(80);
+          }
+          await delay(380);
+          resolve();
+        })();
+      }
+    }, 88);
+    timerIds.push(iv);
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  SCREEN SHAKE
+// ════════════════════════════════════════════════════════════════════
+function screenShake(ms, intensity) {
+  const t0 = Date.now();
+  function tick() {
+    const elapsed = Date.now() - t0;
+    if (elapsed < ms) {
+      const d = 1 - elapsed / ms;
+      const sx = (Math.random() - .5) * intensity * 2 * d;
+      const sy = (Math.random() - .5) * intensity * 2 * d;
+      introCont.style.transform = `translate(${sx}px,${sy}px)`;
+      requestAnimationFrame(tick);
+    } else {
+      introCont.style.transform = '';
+    }
+  }
+  tick();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  CANVAS RENDER LOOP
+// ════════════════════════════════════════════════════════════════════
+function drawParticles(ts) {
+  ctx.clearRect(0, 0, W, H);
+
+  if (canvasMode === 'gathering' || canvasMode === 'formed') {
+    const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.min(W,H) * 0.42);
+    grd.addColorStop(0, 'rgba(138,43,226,0.09)');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.save();
+  particles.forEach(p => { p.update(canvasMode); p.draw(); });
+  ctx.restore();
+  ctx.globalAlpha = 1;
+
+  if ((canvasMode === 'gathering' || canvasMode === 'formed') && logoAlpha > 0) {
+    drawLogoOverlay(ts);
+  }
+
+  animId = requestAnimationFrame(drawParticles);
+}
+
+function drawLogoOverlay(ts) {
+  const fs1   = Math.min(W / 7.2, 92);
+  const fs2   = Math.min(W / 16, 44);
+  const cy    = H / 2;
+  const pulse = 0.88 + 0.12 * Math.sin(Date.now() * 0.0018);
+
+  ctx.save();
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+
+  const layers = [
+    { blur:70, col:'rgba(138,43,226,0.10)' },
+    { blur:35, col:'rgba(138,43,226,0.25)' },
+    { blur:18, col:'rgba(175,90,255,0.50)' },
+    { blur: 8, col:'rgba(210,140,255,0.80)' },
+    { blur: 0, col:'#ffffff'               },
+  ];
+
+  for (const { blur, col } of layers) {
+    ctx.globalAlpha  = logoAlpha * pulse;
+    ctx.shadowBlur   = blur;
+    ctx.shadowColor  = '#8A2BE2';
+    ctx.fillStyle    = col;
+    ctx.font = `bold ${fs1}px Share Tech Mono,'Courier New',monospace`;
+    ctx.fillText('ReveB 2', W/2, cy - fs1 * 0.65);
+    ctx.font = `bold ${fs2}px Share Tech Mono,'Courier New',monospace`;
+    ctx.fillText(': OVERCLOCK', W/2, cy + fs2 * 0.65);
+  }
+
+  ctx.globalAlpha = logoAlpha * 0.35;
+  ctx.shadowBlur  = 0;
+  ctx.strokeStyle = '#8A2BE2';
+  ctx.lineWidth   = 1;
+  const ruleW = Math.min(W * 0.45, 340);
+  ctx.beginPath();
+  ctx.moveTo(W/2 - ruleW/2, cy + fs2 * 1.7);
+  ctx.lineTo(W/2 + ruleW/2, cy + fs2 * 1.7);
+  ctx.stroke();
+
+  if (clickEnabled) {
+    const blink = Math.floor(Date.now() / 560) % 2 === 0;
+    ctx.globalAlpha = logoAlpha * (blink ? 0.9 : 0);
+    ctx.shadowBlur  = 10;
+    ctx.shadowColor = '#8A2BE2';
+    ctx.fillStyle   = '#8A2BE2';
+    ctx.font        = `13px Share Tech Mono,'Courier New',monospace`;
+    ctx.fillText(
+      '[ ESPACE  ou  CLIC  pour  initialiser  le  système ]',
+      W/2, cy + fs2 * 1.7 + 36
+    );
+  }
+
+  ctx.restore();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  TRANSITION → GAME
+// ════════════════════════════════════════════════════════════════════
+function transitionToGame() {
+  if (introPhase === 'transitioning') return;
+  introPhase   = 'transitioning';
+  clickEnabled = false;
+
+  stopMenuHum(400);
+  sfxSelect();
+
+  particles.forEach(p => {
+    if (Math.random() < 0.35) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = Math.random() * 12 + 4;
+      p.vx = Math.cos(ang) * spd;
+      p.vy = Math.sin(ang) * spd;
+    }
+  });
+  canvasMode = 'exploding';
+
+  setTimeout(() => {
+    gsap.to(flashEl, {
+      opacity: 1, duration: 0.14, ease: 'power4.in',
+      onComplete: () => {
+        cancelAnimationFrame(animId);
+        introCont.style.display = 'none';
+
+        gsap.to(flashEl, {
+          opacity: 0, duration: 0.65, delay: 0.08, ease: 'power3.out',
+          onComplete: () => launchGameMenu()
+        });
+      }
+    });
+  }, 180);
+}
+
+function skipIntro() {
+  if (introPhase === 'transitioning') return;
+  timerIds.forEach(id => { clearTimeout(id); clearInterval(id); });
+  timerIds = [];
+  transitionToGame();
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  GAME MENU (Title Screen)
+// ════════════════════════════════════════════════════════════════════
+function launchGameMenu() {
+  // Start ambient hum for menu atmosphere
+  startMenuHum();
+
+  const items    = ['NOUVELLE PARTIE', 'SUCCÈS', 'OPTIONS', 'QUITTER'];
+  let selected   = 0;
+  let menuAnimId = null;
+  let lastHover  = -1;
+
+  // Star field
+  const stars = Array.from({ length: 140 }, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    s: Math.random() * 1.4 + 0.3,
+    b: Math.random() * Math.PI * 2,
+    spd: Math.random() * 0.0008 + 0.0003
+  }));
+
+  // Floating orbs
+  const orbs = Array.from({ length: 5 }, () => ({
+    x: Math.random() * W, y: Math.random() * H,
+    r: Math.random() * 80 + 40,
+    seed: Math.random() * 6.28
+  }));
+
+  document.addEventListener('keydown', onMenuKey);
+  gameCanvas.addEventListener('click', onMenuClick);
+  document.addEventListener('mousemove', onMenuMouse);
+
+  let hoverIdx = -1;
+
+  function onMenuKey(e) {
+    if (e.key === 'ArrowUp'   || e.key === 'w') { selected = (selected - 1 + items.length) % items.length; sfxHover(); }
+    if (e.key === 'ArrowDown' || e.key === 's') { selected = (selected + 1) % items.length; sfxHover(); }
+    if (e.key === 'Enter' || e.key === ' ')     activateItem(selected);
+  }
+  function onMenuClick(e) {
+    if (hoverIdx >= 0) activateItem(hoverIdx);
+  }
+  function onMenuMouse(e) {
+    const gw = gameCanvas.width, gh = gameCanvas.height;
+    const fs1 = Math.min(gw / 7.2, 92);
+    const fs2 = Math.min(gw / 16, 44);
+    const cy  = gh * 0.36;
+    const menuStartY = cy + fs2 * 1.7 + 80;
+    const spacing    = 46;
+    hoverIdx = -1;
+    items.forEach((_, i) => {
+      const itemY = menuStartY + i * spacing;
+      if (Math.abs(e.clientY - itemY) < 20) { hoverIdx = i; selected = i; }
+    });
+    // Play hover sound only when selection changes
+    if (hoverIdx !== lastHover && hoverIdx >= 0) {
+      sfxHover();
+      lastHover = hoverIdx;
+    }
+    if (hoverIdx < 0) lastHover = -1;
+  }
+
+  function activateItem(i) {
+    sfxSelect();
+    if (i === 0) {
+      // ── NOUVELLE PARTIE : cinématique d'intro d'abord ──
+      stopMenuHum(200);
+      cancelAnimationFrame(menuAnimId);
+      gsap.to(flashEl, {
+        opacity: 1, duration: 0.18, ease: 'power4.in',
+        onComplete: () => {
+          window.location.href = 'archives-de-la-chute.html';
+        }
+      });
+    } else if (i === 1) {
+      // CONTINUER — not implemented; flash grey
+      gCtx.fillStyle = 'rgba(255,255,255,0.05)';
+      gCtx.fillRect(0, 0, gameCanvas.width, gameCanvas.height);
+    } else if (i === 2) {
+      // OPTIONS — placeholder
+    } else if (i === 3) {
+      // QUITTER — go back to start of intro
+      stopMenuHum(300);
+      cancelAnimationFrame(menuAnimId);
+      window.location.reload();
+    }
+  }
+
+  function drawMenu(ts) {
+    const gw = gameCanvas.width, gh = gameCanvas.height;
+    gCtx.clearRect(0, 0, gw, gh);
+
+    gCtx.fillStyle = '#000006';
+    gCtx.fillRect(0, 0, gw, gh);
+
+    // Subtle grid
+    gCtx.save();
+    gCtx.strokeStyle = 'rgba(138,43,226,0.07)';
+    gCtx.lineWidth   = 1;
+    const grid = 60;
+    for (let x = 0; x < gw; x += grid) {
+      gCtx.beginPath(); gCtx.moveTo(x, 0); gCtx.lineTo(x, gh); gCtx.stroke();
+    }
+    for (let y = 0; y < gh; y += grid) {
+      gCtx.beginPath(); gCtx.moveTo(0, y); gCtx.lineTo(gw, y); gCtx.stroke();
+    }
+    gCtx.restore();
+
+    // Ambient orbs
+    orbs.forEach(o => {
+      const ox = o.x + Math.sin(ts * 0.0004 + o.seed) * 30;
+      const oy = o.y + Math.cos(ts * 0.0003 + o.seed * 1.3) * 20;
+      const grd = gCtx.createRadialGradient(ox, oy, 0, ox, oy, o.r);
+      grd.addColorStop(0, 'rgba(138,43,226,0.06)');
+      grd.addColorStop(1, 'transparent');
+      gCtx.fillStyle = grd;
+      gCtx.fillRect(0, 0, gw, gh);
+    });
+
+    // Stars
+    stars.forEach(s => {
+      const tw = 0.4 + 0.6 * Math.sin(ts * s.spd + s.b);
+      gCtx.globalAlpha = tw * 0.55;
+      gCtx.fillStyle   = '#fff';
+      gCtx.fillRect(s.x, s.y, s.s, s.s);
+    });
+    gCtx.globalAlpha = 1;
+
+    // ── Logo ──
+    const fs1  = Math.min(gw / 7.2, 92);
+    const fs2  = Math.min(gw / 16,  44);
+    const cy   = gh * 0.36;
+    const pls  = 0.90 + 0.10 * Math.sin(ts * 0.0016);
+
+    gCtx.save();
+    gCtx.textAlign    = 'center';
+    gCtx.textBaseline = 'middle';
+
+    [[50,'rgba(138,43,226,0.12)'],[24,'rgba(138,43,226,0.28)'],[10,'rgba(175,90,255,0.6)'],[0,'#fff']].forEach(([bl,col]) => {
+      gCtx.globalAlpha  = pls;
+      gCtx.shadowBlur   = bl;
+      gCtx.shadowColor  = '#8A2BE2';
+      gCtx.fillStyle    = col;
+      gCtx.font         = `bold ${fs1}px Share Tech Mono,'Courier New',monospace`;
+      gCtx.fillText('ReveB 2', gw/2, cy);
+      gCtx.font         = `bold ${fs2}px Share Tech Mono,'Courier New',monospace`;
+      gCtx.fillStyle    = col === '#fff' ? '#b87aff' : col;
+      gCtx.fillText(': OVERCLOCK', gw/2, cy + fs1 * 0.76);
+    });
+    gCtx.restore();
+
+    // Separator
+    const menuStartY = cy + fs2 * 1.7 + 48;
+    gCtx.save();
+    gCtx.globalAlpha  = 0.25;
+    gCtx.strokeStyle  = '#8A2BE2';
+    gCtx.lineWidth    = 1;
+    const rw = Math.min(gw * 0.38, 280);
+    gCtx.beginPath();
+    gCtx.moveTo(gw/2 - rw/2, menuStartY - 10);
+    gCtx.lineTo(gw/2 + rw/2, menuStartY - 10);
+    gCtx.stroke();
+    gCtx.restore();
+
+    // ── Menu items ──
+    const spacing = 46;
+    items.forEach((item, i) => {
+      const iy = menuStartY + i * spacing;
+      const isSel = i === selected;
+
+      // Hover glow background
+      if (isSel) {
+        const hGrd = gCtx.createLinearGradient(gw/2 - 160, iy - 18, gw/2 + 160, iy + 18);
+        hGrd.addColorStop(0, 'transparent');
+        hGrd.addColorStop(0.3, 'rgba(138,43,226,0.06)');
+        hGrd.addColorStop(0.7, 'rgba(138,43,226,0.06)');
+        hGrd.addColorStop(1, 'transparent');
+        gCtx.fillStyle = hGrd;
+        gCtx.fillRect(gw/2 - 160, iy - 18, 320, 36);
+      }
+
+      gCtx.save();
+      gCtx.textAlign    = 'center';
+      gCtx.textBaseline = 'middle';
+
+      if (isSel) {
+        gCtx.shadowBlur  = 18;
+        gCtx.shadowColor = '#8A2BE2';
+        gCtx.fillStyle   = i === 0 ? '#00ff88' : '#fff';
+        gCtx.globalAlpha = 1;
+        gCtx.font        = `bold 17px Share Tech Mono,'Courier New',monospace`;
+        gCtx.fillText(`▶  ${item}  ◀`, gw/2, iy);
+      } else {
+        gCtx.globalAlpha = 0.3;
+        gCtx.fillStyle   = '#8A2BE2';
+        gCtx.font        = `15px Share Tech Mono,'Courier New',monospace`;
+        gCtx.fillText(item, gw/2, iy);
+      }
+      gCtx.restore();
+    });
+
+    // Footer
+    gCtx.save();
+    gCtx.textAlign    = 'center';
+    gCtx.textBaseline = 'middle';
+    gCtx.globalAlpha  = 0.3;
+    gCtx.fillStyle    = '#8A2BE2';
+    gCtx.font         = `11px Share Tech Mono,'Courier New',monospace`;
+    gCtx.fillText('↑ ↓  NAVIGUER   •   ENTRÉE  SÉLECTIONNER', gw/2, gh - 28);
+    gCtx.restore();
+
+    gCtx.globalAlpha = 1;
+    menuAnimId = requestAnimationFrame(drawMenu);
+  }
+
+  requestAnimationFrame(drawMenu);
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  UTILITY
+// ════════════════════════════════════════════════════════════════════
+function delay(ms) {
+  return new Promise(resolve => {
+    const tid = setTimeout(resolve, ms);
+    timerIds.push(tid);
+  });
+}
+
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  INPUT
+// ════════════════════════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (introPhase === 'transitioning') return;
+  if (e.key === 'Escape' || e.key === 'Enter') { skipIntro(); return; }
+  if ((e.key === ' ' || e.code === 'Space') && clickEnabled) {
+    e.preventDefault();
+    transitionToGame();
+  }
+});
+document.addEventListener('click', () => {
+  if (clickEnabled && introPhase !== 'transitioning') transitionToGame();
+});
+skipHint.addEventListener('click', e => {
+  e.stopPropagation();
+  skipIntro();
+});
+
+// ════════════════════════════════════════════════════════════════════
+//  MAIN SEQUENCE
+// ════════════════════════════════════════════════════════════════════
+async function runIntro() {
+  // Warm up AudioContext on first user interaction
+  const warmUp = () => { try { getAC(); } catch(e) {} };
+  document.addEventListener('click', warmUp, { once: true });
+  document.addEventListener('keydown', warmUp, { once: true });
+
+  // ── PHASE 1 : Terminal ─────────────────────────────────────────
+  introPhase = 'terminal';
+  await runTerminalPhase();
+  await delay(280);
+
+  // ── PHASE 2 : Corruption ───────────────────────────────────────
+  introPhase = 'corruption';
+  await runCorruptionPhase();
+  await delay(200);
+
+  // ── PHASE 3 : Explosion ────────────────────────────────────────
+  introPhase = 'exploding';
+
+  const termSamples = buildTerminalSamples();
+
+  const MAX_P = 4000;
+  const step  = Math.max(1, Math.ceil(termSamples.length / MAX_P));
+  for (let i = 0; i < termSamples.length; i += step) {
+    const s = termSamples[i];
+    particles.push(new Particle(s.x, s.y, s.r, s.g, s.b));
+  }
+
+  const rect = termWrapper.getBoundingClientRect();
+  while (particles.length < 800) {
+    particles.push(new Particle(
+      rect.left  + Math.random() * rect.width,
+      rect.top   + Math.random() * rect.height,
+      138, 43, 226
+    ));
+  }
+
+  termWrapper.style.transition = 'opacity .08s';
+  termWrapper.style.opacity    = '0';
+
+  // ── EXPLOSION AUDIO + SCREEN SHAKE ──
+  sfxExplosion();
+  screenShake(750, 24);
+
+  particles.forEach(p => p.explode());
+  canvasMode = 'exploding';
+  requestAnimationFrame(drawParticles);
+
+  await delay(1700);
+
+  // ── PHASE 4 : Gathering → Logo ─────────────────────────────────
+  introPhase = 'gathering';
+
+  const logoSamples = shuffle(buildLogoSamples());
+  particles.forEach((p, i) => {
+    const t   = logoSamples[i % logoSamples.length];
+    p.tx = t.x;
+    p.ty = t.y;
+    p.r = 138; p.g = 43; p.b = 226;
+    if (p.alpha < 0.05) p.alpha = 0.05;
+  });
+
+  canvasMode = 'gathering';
+
+  const logoFadeIn = setInterval(() => {
+    logoAlpha = Math.min(1, logoAlpha + 0.014);
+    if (logoAlpha >= 1) clearInterval(logoFadeIn);
+  }, 16);
+
+  await delay(2400);
+
+  canvasMode = 'formed';
+  introPhase = 'formed';
+
+  await delay(700);
+
+  clickEnabled = true;
+  introPhase   = 'ready';
+}
+
+// 🚀 GO
+runIntro();
+</script>
+</body>
+</html>

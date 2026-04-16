@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Visualiseur de Boss</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bangers&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#020005;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+/* Effets Post-Processing CSS (Scanlines, Vignette) pour le style ReveB 2 */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.25) 50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06));background-size:100% 2px, 3px 100%;opacity:0.6;}
+#vignette{position:fixed;inset:0;z-index:89;pointer-events:none;background:radial-gradient(circle at center, transparent 40%, #000 120%);}
+
+/* ─── INTERFACE DE CONTRÔLE ───────────────────────────────────────────────── */
+#ui-panel {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 15px;
+    background: rgba(10, 0, 20, 0.85);
+    padding: 15px 30px;
+    border: 2px solid #8A2BE2;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(138,43,226,0.4);
+    backdrop-filter: blur(5px);
+}
+
+.btn {
+    padding: 10px 20px;
+    border: 2px solid #555;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 1.2rem;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: bold;
+    transition: all 0.2s;
+    letter-spacing: 2px;
+}
+
+.btn:hover {
+    color: #fff;
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.btn.active {
+    color: #00F5FF;
+    border-color: #00F5FF;
+    box-shadow: 0 0 15px rgba(0,245,255,0.6);
+    background: rgba(0,245,255,0.1);
+}
+
+/* ─── INFOS DEBUG ─────────────────────────────────────────────────────────── */
+#debug-info {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 100;
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="vignette"></div>
+
+<div id="ui-panel">
+    <button class="btn active" id="btn-1" onclick="setPhase(1)">PHASE 1</button>
+    <button class="btn" id="btn-2" onclick="setPhase(2)">PHASE 2</button>
+    <button class="btn" id="btn-3" onclick="setPhase(3)">PHASE 3</button>
+</div>
+
+<div id="debug-info">
+    <div id="fps-counter">FPS: 0</div>
+    <div id="time-counter">Temps: 0s</div>
+</div>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURATION DU CANVAS & OUTILS VISUELS
+// ═══════════════════════════════════════════════════════════
+const cv = document.getElementById('c'), cx = cv.getContext('2d', {alpha: false});
+let W, H;
+let currentPhase = 1;
+
+// Constantes de couleurs ReveB 2
+const K = {
+    pur: '#8A2BE2', 
+    wh: '#ffffff', 
+    bk: '#000000', 
+    gold: '#FFD700', 
+    red: '#FF003C', 
+    blue: '#00F5FF', 
+    drk: '#050011'
+};
+
+// Helpers de dessin (très utiles pour les boss)
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+
+function resize() {
+    W = cv.width = innerWidth; 
+    H = cv.height = innerHeight;
+}
+window.addEventListener('resize', resize); 
+resize();
+
+// ═══════════════════════════════════════════════════════════
+//  GESTION DE L'INTERFACE
+// ═══════════════════════════════════════════════════════════
+function setPhase(phase) {
+    currentPhase = phase;
+    
+    // Mise à jour visuelle des boutons
+    document.getElementById('btn-1').classList.remove('active');
+    document.getElementById('btn-2').classList.remove('active');
+    document.getElementById('btn-3').classList.remove('active');
+    document.getElementById(`btn-${phase}`).classList.add('active');
+    
+    // Réinitialisation du temps local si besoin pour tester les animations d'entrée
+    tT = 0; 
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BOUCLE DE RENDU PRINCIPALE
+// ═══════════════════════════════════════════════════════════
+let tT = 0, lastT = 0, frames = 0, lastFpsT = 0;
+
+function draw(ts) {
+    // Calcul du deltaTime et du temps total
+    const dt = Math.min(ts - lastT, 50) || 0; 
+    lastT = ts; 
+    tT += dt;
+
+    // Calcul FPS
+    frames++;
+    if (ts - lastFpsT >= 1000) {
+        document.getElementById('fps-counter').innerText = `FPS: ${frames}`;
+        frames = 0;
+        lastFpsT = ts;
+    }
+    document.getElementById('time-counter').innerText = `Temps: ${(tT/1000).toFixed(1)}s`;
+
+    // 1. Nettoyage et fond de base
+    cx.fillStyle = K.drk; 
+    cx.fillRect(0, 0, W, H);
+
+    // Dessin d'une grille de repère (Optionnelle, pour aider au placement)
+    drawHelperGrid();
+
+    // 2. RENDU SÉPARÉ SELON LA PHASE ACTIVE
+    const centerX = W / 2;
+    const centerY = H / 2;
+
+    if (currentPhase === 1) {
+        
+        // ═══════════════════════════════════════════════════════════
+        //  PHASE 1: ULTRA DETAIL - SYNC & ASYNC (ORBITES ASYNCHRONES)
+        // ═══════════════════════════════════════════════════════════
+        
+        const t = tT / 1000; // Temps en secondes
+        const pulse = Math.pow(Math.sin(t * 2), 4); // Pulsation organique
+        const bossScale = 1 + pulse * 0.08;
+
+        // --- 1. FOND DYNAMIQUE : VORTEX DE DONNÉES ET GRILLE SPIRALE ---
+        cx.save();
+        
+        // Nébuleuse centrale (Lueur gravitationnelle)
+        const bgGrad = cx.createRadialGradient(centerX, centerY, 20, centerX, centerY, W/1.2);
+        bgGrad.addColorStop(0, 'rgba(138,43,226, 0.25)');
+        bgGrad.addColorStop(0.4, 'rgba(0,245,255, 0.05)');
+        bgGrad.addColorStop(1, 'rgba(5,0,17, 0)');
+        cx.fillStyle = bgGrad;
+        cx.fillRect(0, 0, W, H);
+
+        // Grille polaire (Toile d'araignée aspirée par le centre)
+        cx.lineWidth = 1.5;
+        const rings = 12;
+        const segments = 24;
+        
+        // Rayons convergents en spirale mouvante
+        cx.beginPath();
+        for(let s = 0; s < segments; s++) {
+            let baseAngle = (s / segments) * Math.PI * 2 + (t * 0.15);
+            cx.moveTo(centerX, centerY);
+            
+            // On trace la courbe pour faire un effet de spirale 3D
+            for(let d = 20; d < W; d += 60) {
+                let spiralAngle = baseAngle + (d * 0.0015) * Math.sin(t * 0.8);
+                cx.lineTo(centerX + Math.cos(spiralAngle) * d, centerY + Math.sin(spiralAngle) * d);
+            }
+        }
+        cx.strokeStyle = `rgba(138, 43, 226, 0.15)`;
+        cx.stroke();
+
+        // Anneaux d'ondes radar qui s'échappent du centre
+        for(let r = 0; r < rings; r++) {
+            let radius = ((r * 100) + (tT / 12)) % (rings * 100);
+            let alpha = Math.max(0, 1 - radius / (rings * 80));
+            
+            cx.beginPath();
+            cx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            cx.strokeStyle = `rgba(0, 245, 255, ${alpha * 0.3})`;
+            cx.stroke();
+        }
+
+        // Flux de données (Lignes de lumière aspirées vers le boss)
+        cx.lineWidth = 2;
+        for(let i = 0; i < 200; i++) {
+            // Angles fixes mais distribution chaotique
+            const angle = (i * 13.5) + t * 0.2; 
+            // Les particules tombent vers le centre
+            const dist = ((i * 47.3) + tT * (0.15 + (i%5)*0.05)) % (W / 1.2);
+            
+            // Zone de sécurité autour du boss
+            if(dist > 100) {
+                const alpha = Math.max(0, 1 - dist / (W / 1.2));
+                const px = centerX + Math.cos(angle) * dist;
+                const py = centerY + Math.sin(angle) * dist;
+                
+                // Traînée cinétique de la particule
+                const tailLength = 20 + (i % 15);
+                const tx = centerX + Math.cos(angle) * (dist + tailLength);
+                const ty = centerY + Math.sin(angle) * (dist + tailLength);
+
+                // Scintillement
+                cx.globalAlpha = alpha * (0.2 + Math.sin(t * 5 + i) * 0.3);
+                cx.strokeStyle = i % 2 === 0 ? K.pur : K.blue;
+                glow(cx.strokeStyle, 10);
+                
+                cx.beginPath(); 
+                cx.moveTo(px, py); 
+                cx.lineTo(tx, ty); 
+                cx.stroke();
+                noGlow();
+            }
+        }
+        cx.globalAlpha = 1;
+        cx.restore();
+
+        // --- 2. CALCUL DES POSITIONS DES ORBES (SYNC & ASYNC) ---
+        // Trajectoires complexes en huit (Courbes de Lissajous)
+        const ampX = 350 + Math.sin(t * 0.5) * 50; 
+        const ampY = 200 + Math.cos(t * 0.8) * 30;
+        
+        // Sync (Rouge)
+        const rX = centerX + Math.cos(t * 1.2) * ampX * Math.cos(t * 0.3);
+        const rY = centerY + Math.sin(t * 2.4) * ampY;
+        
+        // Async (Bleu) - Totalement désynchronisé (fréquences impaires)
+        const bX = centerX + Math.sin(t * 1.5) * ampX;
+        const bY = centerY + Math.cos(t * 2.1) * ampY * Math.sin(t * 0.4);
+
+        // --- 3. ÉCLAIRS / LIAISONS ÉNERGÉTIQUES ---
+        // Fonction interne pour dessiner des éclairs procéduraux
+        const drawLightning = (x1, y1, x2, y2, color, segments, displacement) => {
+            cx.save();
+            glow(color, 25);
+            cx.strokeStyle = color;
+            cx.lineWidth = 1.5 + Math.random() * 2;
+            cx.beginPath();
+            cx.moveTo(x1, y1);
+            let lx = x1, ly = y1;
+            for (let i = 1; i <= segments; i++) {
+                const ratio = i / segments;
+                let nx = x1 + (x2 - x1) * ratio;
+                let ny = y1 + (y2 - y1) * ratio;
+                
+                if (i < segments) {
+                    // Variation chaotique très rapide pour l'effet électrique
+                    nx += (Math.random() - 0.5) * displacement;
+                    ny += (Math.random() - 0.5) * displacement;
+                }
+                cx.lineTo(nx, ny);
+                
+                // Branches/Fourches occasionnelles
+                if(Math.random() < 0.25) {
+                    cx.moveTo(lx, ly);
+                    cx.lineTo(lx + (Math.random() - 0.5) * displacement * 1.5, ly + (Math.random() - 0.5) * displacement * 1.5);
+                    cx.moveTo(nx, ny); // Retour au chemin principal
+                }
+                lx = nx; ly = ny;
+            }
+            cx.stroke();
+            noGlow();
+            cx.restore();
+        };
+
+        // Décharges aléatoires crépitantes
+        if (Math.random() < 0.8) drawLightning(centerX, centerY, rX, rY, K.red, 15, 35);
+        if (Math.random() < 0.8) drawLightning(centerX, centerY, bX, bY, K.blue, 15, 35);
+
+        // --- 4. DESSIN DES ORBES EXTERNES ---
+        [ 
+            {x: rX, y: rY, c: K.red, ang: t*3}, 
+            {x: bX, y: bY, c: K.blue, ang: -t*2.5} 
+        ].forEach(orb => {
+            cx.save();
+            cx.translate(orb.x, orb.y);
+            cx.rotate(orb.ang);
+
+            // Distorsion spatiale (anneaux brisés qui tournent)
+            cx.lineWidth = 2;
+            for(let j=0; j<4; j++) {
+                cx.strokeStyle = `rgba(255,255,255, ${0.1 + (j*0.1)})`;
+                cx.beginPath();
+                const arcRad = 70 - j*12 + Math.sin(t*10 + j)*5;
+                cx.arc(0, 0, arcRad, j, j + Math.PI * 1.2);
+                cx.stroke();
+            }
+
+            // Noyau de l'orbe principal
+            glow(orb.c, 40 + Math.random()*25);
+            cx.fillStyle = orb.c;
+            cx.beginPath(); cx.arc(0, 0, 35, 0, Math.PI*2); cx.fill();
+            
+            // Coeur incandescent tremblant
+            cx.fillStyle = '#fff';
+            glow('#fff', 20);
+            cx.beginPath(); cx.arc(Math.cos(t*20)*3, Math.sin(t*20)*3, 14, 0, Math.PI*2); cx.fill();
+            
+            // Hexagone holographique autour de l'orbe
+            noGlow();
+            cx.strokeStyle = orb.c;
+            cx.lineWidth = 3;
+            const polySize = 48;
+            cx.beginPath();
+            for(let i=0; i<6; i++) {
+                const a = (i/6) * Math.PI*2;
+                if(i===0) cx.moveTo(Math.cos(a) * polySize, Math.sin(a) * polySize); 
+                else cx.lineTo(Math.cos(a) * polySize, Math.sin(a) * polySize);
+            }
+            cx.closePath();
+            cx.stroke();
+            
+            cx.restore();
+        });
+
+        // --- 5. DESSIN DU NOYAU CENTRAL (LE BOSS) ---
+        cx.save();
+        cx.translate(centerX, centerY);
+        cx.scale(bossScale, bossScale);
+
+        // 5a. Halo géant violet respirant
+        glow(K.pur, 120 + pulse * 60);
+        cx.fillStyle = `rgba(138,43,226, ${0.15 + pulse*0.1})`;
+        cx.beginPath(); cx.arc(0, 0, 160, 0, Math.PI*2); cx.fill();
+
+        // 5b. Sphère d'énergie noire au centre (Trou noir de données)
+        glow('#000', 40);
+        cx.fillStyle = '#05000a';
+        cx.beginPath(); cx.arc(0, 0, 95, 0, Math.PI*2); cx.fill();
+
+        // 5c. Anneaux Gyroscopiques (Pseudo-3D via ellipse)
+        noGlow();
+        cx.lineWidth = 4;
+        const rR = 130; // Ring Radius
+        
+        // Anneau X (Violet)
+        cx.save(); cx.rotate(t * 0.8);
+        glow(K.pur, 20); cx.strokeStyle = `rgba(138,43,226, 0.85)`;
+        cx.beginPath(); cx.ellipse(0, 0, rR, rR * 0.25, 0, 0, Math.PI*2); cx.stroke();
+        // Connecteurs mécaniques sur l'anneau
+        cx.fillStyle = '#fff'; cx.fillRect(rR-6, -6, 12, 12); cx.fillRect(-rR-6, -6, 12, 12);
+        cx.restore();
+
+        // Anneau Y (Rouge)
+        cx.save(); cx.rotate(-t * 1.1 + Math.PI/3);
+        glow(K.red, 20); cx.strokeStyle = `rgba(255,0,60, 0.75)`;
+        cx.beginPath(); cx.ellipse(0, 0, rR*1.1, rR * 0.15, 0, 0, Math.PI*2); cx.stroke();
+        cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, rR*1.1, 6, 0, Math.PI*2); cx.fill();
+        cx.restore();
+
+        // Anneau Z (Bleu)
+        cx.save(); cx.rotate(t * 1.5 + Math.PI/2);
+        glow(K.blue, 20); cx.strokeStyle = `rgba(0,245,255, 0.75)`;
+        cx.beginPath(); cx.ellipse(0, 0, rR*0.9, rR * 0.35, 0, 0, Math.PI*2); cx.stroke();
+        cx.restore();
+
+        // 5d. Le Coeur de Cristal (Octogone rotatif)
+        cx.rotate(Math.PI/8 + t * 0.5);
+        const cSize = 80;
+        glow(K.pur, 50);
+        cx.fillStyle = `rgba(138,43,226, ${0.4 + pulse*0.3})`;
+        cx.beginPath();
+        for(let i=0; i<8; i++) {
+            const a = (i/8) * Math.PI*2;
+            if(i===0) cx.moveTo(Math.cos(a) * cSize, Math.sin(a) * cSize); 
+            else cx.lineTo(Math.cos(a) * cSize, Math.sin(a) * cSize);
+        }
+        cx.closePath(); cx.fill();
+        
+        // Bordures du cristal
+        cx.lineWidth = 3;
+        cx.strokeStyle = '#fff';
+        cx.stroke();
+
+        // Facettes internes du cristal
+        cx.lineWidth = 1;
+        cx.strokeStyle = `rgba(255,255,255,0.6)`;
+        cx.beginPath();
+        cx.moveTo(-cSize, 0); cx.lineTo(cSize, 0);
+        cx.moveTo(0, -cSize); cx.lineTo(0, cSize);
+        cx.stroke();
+
+        // 5e. Les Yeux (Sync & Async enfermés)
+        cx.rotate(-Math.PI/8 - t * 0.5); // Annule la rotation pour garder les yeux alignés
+        noGlow();
+        
+        const eyeDist = 38;
+        const eyeRad = 20;
+        
+        // Oeil Gauche (Sync - Rouge) -> Comportement SACCADÉ & NERVEUX
+        cx.save();
+        cx.translate(-eyeDist, 0);
+        glow(K.red, 25); cx.fillStyle = K.red;
+        cx.beginPath(); cx.arc(0, 0, eyeRad, 0, Math.PI*2); cx.fill();
+        
+        noGlow(); cx.fillStyle = '#fff';
+        // Math.floor force des paliers, créant les saccades (Tick tick tick)
+        const sacX = Math.cos(Math.floor(t * 12)) * eyeRad * 0.45;
+        const sacY = Math.sin(Math.floor(t * 18)) * eyeRad * 0.45;
+        cx.beginPath(); cx.arc(sacX, sacY, eyeRad*0.35, 0, Math.PI*2); cx.fill();
+        
+        // Petite croix glitchée dans l'oeil rouge
+        cx.strokeStyle = '#000'; cx.lineWidth = 2;
+        cx.beginPath(); cx.moveTo(sacX-4, sacY); cx.lineTo(sacX+4, sacY); cx.moveTo(sacX, sacY-4); cx.lineTo(sacX, sacY+4); cx.stroke();
+        cx.restore();
+
+        // Oeil Droit (Async - Bleu) -> Comportement FLUIDE & CONTINU
+        cx.save();
+        cx.translate(eyeDist, 0);
+        glow(K.blue, 25); cx.fillStyle = K.blue;
+        cx.beginPath(); cx.arc(0, 0, eyeRad, 0, Math.PI*2); cx.fill();
+        
+        noGlow(); cx.fillStyle = '#fff';
+        // Utilisation simple de Sin/Cos pour un balayage fluide
+        const fluX = Math.cos(t * 3.5) * eyeRad * 0.5;
+        const fluY = Math.sin(t * 2.2) * eyeRad * 0.5;
+        cx.beginPath(); cx.arc(fluX, fluY, eyeRad*0.35, 0, Math.PI*2); cx.fill();
+        
+        // Point liquide dans l'oeil bleu
+        cx.fillStyle = '#000';
+        cx.beginPath(); cx.arc(fluX + Math.cos(t*5)*2, fluY + Math.sin(t*5)*2, 2, 0, Math.PI*2); cx.fill();
+        cx.restore();
+
+        // 5f. Effet Scanline final (Uniquement circonscrit sur le boss)
+        cx.globalCompositeOperation = "source-atop";
+        cx.fillStyle = `rgba(0, 0, 0, 0.3)`;
+        for(let i = -160; i < 160; i += 12) {
+            cx.fillRect(-160, i - (t * 80) % 12, 320, 4);
+        }
+        cx.globalCompositeOperation = "source-over";
+
+        cx.restore(); // Fin du Boss Central
+        cx.restore(); // Fin du Fond
+        
+
+    } else if (currentPhase === 2) {
+        
+        // ═══════════════════════════════════════════════════════════
+        //  PHASE 2: ULTRA DETAIL - FUSION & RAYONS D'ÉRADICATION
+        // ═══════════════════════════════════════════════════════════
+        
+        const t = tT / 1000;
+        const pulse = Math.pow(Math.sin(t * 3), 2);
+        
+        // --- 1. FOND DYNAMIQUE : MATRICE D'ÉRADICATION (TUNNEL DE CONFINEMENT) ---
+        cx.save();
+        
+        // Pulsation d'alerte cardiaque (0 à 1)
+        const alarmPulse = Math.pow(Math.sin(t * Math.PI), 2); 
+        
+        // Fond lourd et oppressant
+        const bgGrad = cx.createRadialGradient(centerX, centerY, 10, centerX, centerY, W);
+        bgGrad.addColorStop(0, `rgba(5, 0, 10, 1)`);
+        bgGrad.addColorStop(0.5, `rgba(20, 0, 5, 1)`);
+        bgGrad.addColorStop(1, `rgba(60, 0, 10, ${0.2 + alarmPulse * 0.4})`);
+        cx.fillStyle = bgGrad;
+        cx.fillRect(0, 0, W, H);
+
+        // Effet de Tunnel pseudo-3D rectangulaire (La salle s'enfonce)
+        cx.lineWidth = 2;
+        const rectCount = 10;
+        for(let i = 0; i < rectCount; i++) {
+            // Calcul de la profondeur Z (qui avance vers la caméra)
+            let z = ((i * 100) - (tT / 3)) % 1000;
+            if (z < 0) z += 1000;
+            
+            // Perspective (les carrés lointains sont petits, les proches immenses)
+            const scale = Math.pow(z / 1000, 2.5); 
+            const alpha = 1 - (z / 1000); // S'estompe au loin
+
+            const rw = W * scale * 1.5;
+            const rh = H * scale * 1.5;
+
+            cx.strokeStyle = `rgba(255, 0, 60, ${alpha * 0.6})`;
+            glow(K.red, 15 * scale);
+            cx.strokeRect(centerX - rw/2, centerY - rh/2, rw, rh);
+            noGlow();
+        }
+
+        // Lignes de fuite vers le centre pour marquer la perspective
+        cx.strokeStyle = `rgba(255, 0, 60, 0.15)`;
+        cx.lineWidth = 1;
+        cx.beginPath();
+        cx.moveTo(0, 0); cx.lineTo(W, H);
+        cx.moveTo(W, 0); cx.lineTo(0, H);
+        cx.moveTo(centerX, 0); cx.lineTo(centerX, H);
+        cx.moveTo(0, centerY); cx.lineTo(W, centerY);
+        cx.stroke();
+
+        // Chevrons d'avertissement géants (Danger Industriel) défilant sur les bords extérieurs
+        cx.globalCompositeOperation = "screen";
+        const chevronOffset = (tT / 2) % 200;
+        cx.fillStyle = `rgba(255, 0, 60, ${0.03 + alarmPulse * 0.04})`;
+        for(let y = -200; y < H + 200; y += 200) {
+            let cy = y + chevronOffset;
+            // Chevrons Gauche
+            cx.beginPath();
+            cx.moveTo(0, cy); cx.lineTo(120, cy + 100); cx.lineTo(0, cy + 200);
+            cx.fill();
+            // Chevrons Droite
+            cx.beginPath();
+            cx.moveTo(W, cy); cx.lineTo(W - 120, cy + 100); cx.lineTo(W, cy + 200);
+            cx.fill();
+        }
+        
+        // Particules de cendres / Code corrompu en anti-gravité (qui remontent)
+        cx.globalCompositeOperation = "source-over";
+        for(let i = 0; i < 150; i++) {
+            let px = (Math.sin(i * 34.5) * 0.5 + 0.5) * W;
+            let py = (H - ((i * 87.2 + tT * 0.35) % H));
+            let size = (i % 3) + 1;
+            
+            // Les particules clignotent et certaines deviennent blanches par erreur
+            cx.globalAlpha = (Math.sin(t * 5 + i) * 0.5 + 0.5) * 0.8;
+            if (i % 15 === 0 && Math.sin(t*10 + i) > 0.8) {
+                cx.fillStyle = K.wh;
+                glow(K.wh, 5);
+            } else {
+                cx.fillStyle = K.red;
+                noGlow();
+            }
+            cx.fillRect(px, py, size, size * (1 + (i%3)));
+        }
+
+        cx.restore();
+        cx.globalAlpha = 1;
+        noGlow();
+
+        // --- 2. GESTION DES TOURELLES ET LASERS ---
+        // (La suite de ton code de la Phase 2 avec les tourelles reste ici, NE LA SUPPRIME PAS)
+
+        // --- 2. GESTION DES TOURELLES ET LASERS ---
+        // Cycle de 4 secondes pour l'animation en boucle
+        const cycle = t % 4;
+        const isCharging = cycle < 2.5; // 2.5s de charge
+        const isFiring = cycle >= 2.5 && cycle < 3.0; // 0.5s de tir massif
+        const chargeRatio = isCharging ? cycle / 2.5 : 1;
+
+        // Définition des 4 canons (Haut, Bas, Gauche, Droite)
+        const turrets = [
+            { x: centerX, y: 30, angle: Math.PI/2, c: K.red },      // Haut
+            { x: centerX, y: H - 30, angle: -Math.PI/2, c: K.red }, // Bas
+            { x: 30, y: centerY, angle: 0, c: K.blue },             // Gauche
+            { x: W - 30, y: centerY, angle: Math.PI, c: K.blue }    // Droite
+        ];
+
+        turrets.forEach((turret) => {
+            cx.save();
+            cx.translate(turret.x, turret.y);
+            
+            // Effet de recul (recoil) violent pendant le tir
+            const recoil = isFiring ? Math.random() * 8 : 0;
+            cx.translate(-Math.cos(turret.angle) * recoil, -Math.sin(turret.angle) * recoil);
+            cx.rotate(turret.angle);
+
+            // ── A. DESSIN DU LASER / TELEGRAPH (vers l'avant) ──
+            if (isCharging) {
+                // Hologramme de visée (Telegraph) s'élargissant
+                cx.globalCompositeOperation = "screen";
+                glow(turret.c, 15);
+                cx.fillStyle = turret.c;
+                cx.globalAlpha = 0.05 + chargeRatio * 0.2;
+                cx.fillRect(0, -5 - chargeRatio * 15, W, 10 + chargeRatio * 30);
+                
+                // Ligne de mire pointillée (qui défile vers le canon)
+                cx.setLineDash([15, 15]);
+                cx.lineDashOffset = tT / 5;
+                cx.strokeStyle = '#fff';
+                cx.lineWidth = 2;
+                cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(W, 0); cx.stroke();
+                cx.setLineDash([]); // Reset
+                
+                // Particules d'énergie aspirées par le canon
+                cx.globalAlpha = 1;
+                for(let i=0; i<6; i++) {
+                    const px = 40 + Math.random() * 200 * (1 - chargeRatio);
+                    const py = (Math.random() - 0.5) * 40 * (1 - chargeRatio);
+                    cx.fillStyle = turret.c;
+                    cx.fillRect(px, py, 6 + Math.random()*6, 1.5);
+                }
+            } else if (isFiring) {
+                // RAYON D'ÉRADICATION MASSIF
+                cx.globalCompositeOperation = "screen";
+                const beamWidth = 70 + Math.random() * 30; // Tremblement de l'épaisseur
+                
+                // Aura colorée externe
+                glow(turret.c, 60);
+                cx.fillStyle = turret.c;
+                cx.globalAlpha = 0.85;
+                cx.fillRect(0, -beamWidth/2, W, beamWidth);
+                
+                // Coeur blanc incandescent
+                glow('#fff', 30);
+                cx.fillStyle = '#fff';
+                cx.globalAlpha = 1;
+                cx.fillRect(0, -beamWidth/4, W, beamWidth/2);
+                
+                // Arcs électriques chaotiques autour du rayon
+                cx.strokeStyle = turret.c;
+                cx.lineWidth = 3;
+                cx.beginPath();
+                for(let i=0; i<W; i+=30) {
+                    cx.lineTo(i, (Math.random() - 0.5) * beamWidth * 1.8);
+                }
+                cx.stroke();
+                noGlow();
+            }
+
+            // ── B. DESSIN DE LA TOURELLE (Base mécanique) ──
+            cx.globalCompositeOperation = "source-over";
+            glow('#000', 20);
+            
+            // Plaque de base fixée au mur
+            cx.fillStyle = '#05020a';
+            cx.beginPath(); cx.moveTo(-30, -50); cx.lineTo(10, -35); cx.lineTo(10, 35); cx.lineTo(-30, 50); cx.fill();
+            cx.strokeStyle = '#333'; cx.lineWidth = 2; cx.stroke();
+            
+            // Corps du Canon
+            cx.fillStyle = '#111';
+            cx.fillRect(10, -20, 50, 40);
+            
+            // Indicateur de charge sur le canon
+            glow(turret.c, 30);
+            cx.fillStyle = isFiring ? '#fff' : (isCharging ? turret.c : '#222');
+            const canonCharge = isCharging ? chargeRatio : (isFiring ? 1 : 0);
+            cx.fillRect(15, -12, 40 * canonCharge, 24);
+            
+            // Blindage / Armature du canon
+            cx.strokeStyle = turret.c;
+            cx.lineWidth = 3;
+            cx.strokeRect(10, -20, 50, 40);
+            
+            cx.restore();
+            noGlow();
+        });
+
+        // --- 3. DESSIN DU NOYAU FUSIONNÉ (LE BOSS) ---
+        cx.save();
+        cx.translate(centerX, centerY);
+        
+        // Tremblement global pendant le tir des lasers
+        if (isFiring) {
+            cx.translate((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15);
+        } else {
+            // Flottaison organique le reste du temps
+            cx.translate(0, Math.sin(t * 2.5) * 12);
+        }
+
+        // ── A. Bouclier Énergétique Hexagonal ──
+        glow(K.pur, 70 + pulse * 50);
+        cx.fillStyle = `rgba(138,43,226, ${0.15 + pulse * 0.15})`;
+        cx.strokeStyle = `rgba(138,43,226, 0.9)`;
+        cx.lineWidth = 4;
+        
+        const hexSize = 120;
+        cx.beginPath();
+        for(let i=0; i<6; i++) {
+            const a = (i/6) * Math.PI*2 + t * 0.8;
+            if(i===0) cx.moveTo(Math.cos(a)*hexSize, Math.sin(a)*hexSize);
+            else cx.lineTo(Math.cos(a)*hexSize, Math.sin(a)*hexSize);
+        }
+        cx.closePath(); cx.fill(); cx.stroke();
+        
+        // Rayons internes du bouclier
+        cx.lineWidth = 1.5;
+        cx.beginPath();
+        for(let i=0; i<6; i++) {
+            const a = (i/6) * Math.PI*2 + t * 0.8;
+            cx.moveTo(0,0); cx.lineTo(Math.cos(a)*hexSize, Math.sin(a)*hexSize);
+        }
+        cx.stroke();
+
+        // ── B. Le Monolithe Noir (Le coeur solide) ──
+        glow('#000', 40);
+        cx.fillStyle = '#030006';
+        cx.beginPath();
+        cx.moveTo(0, -85); cx.lineTo(45, 0); cx.lineTo(0, 85); cx.lineTo(-45, 0);
+        cx.fill();
+        
+        // Contours du Monolithe (Alternance Rouge/Bleu glitchée)
+        cx.lineWidth = 6;
+        const glitchColor = (Math.floor(t * 15) % 2 === 0) ? K.red : K.blue;
+        cx.strokeStyle = glitchColor;
+        cx.stroke();
+
+        // Gravures lumineuses sur le monolithe
+        cx.strokeStyle = '#fff';
+        cx.lineWidth = 2;
+        cx.globalAlpha = 0.5;
+        cx.beginPath(); cx.moveTo(0, -60); cx.lineTo(0, -30); cx.stroke();
+        cx.beginPath(); cx.moveTo(0, 60); cx.lineTo(0, 30); cx.stroke();
+        cx.globalAlpha = 1;
+
+        // ── C. L'Oeil Unique de Fusion (Magenta / Violet incandescent) ──
+        const eyeY = -15 + Math.sin(t * 5) * 15; // L'oeil glisse frénétiquement de haut en bas
+        
+        glow(K.pur, 60);
+        cx.fillStyle = K.pur;
+        cx.beginPath(); cx.ellipse(0, eyeY, 22, 38, 0, 0, Math.PI*2); cx.fill();
+        
+        // Pupille Blanche concentrée et agressive
+        glow('#fff', 30);
+        cx.fillStyle = '#fff';
+        cx.beginPath(); cx.ellipse(0, eyeY, 5, 22, 0, 0, Math.PI*2); cx.fill();
+        
+        // Faisceau de scan sortant de l'oeil (Cherche le joueur)
+        cx.globalCompositeOperation = "screen";
+        // Le faisceau balaye de gauche à droite
+        const scanAngle = Math.sin(t * 2.5) * (Math.PI / 3) + Math.PI/2; 
+        
+        const scanGradient = cx.createLinearGradient(0, eyeY, Math.cos(scanAngle)*250, Math.sin(scanAngle)*250 + eyeY);
+        scanGradient.addColorStop(0, `rgba(138,43,226, 0.6)`);
+        scanGradient.addColorStop(1, `rgba(138,43,226, 0)`);
+        
+        cx.fillStyle = scanGradient;
+        cx.beginPath();
+        cx.moveTo(0, eyeY);
+        cx.lineTo(Math.cos(scanAngle - 0.25)*250, Math.sin(scanAngle - 0.25)*250 + eyeY);
+        cx.lineTo(Math.cos(scanAngle + 0.25)*250, Math.sin(scanAngle + 0.25)*250 + eyeY);
+        cx.fill();
+
+        cx.restore();
+        noGlow();
+        
+
+    } else if (currentPhase === 3) {
+        
+        // ═══════════════════════════════════════════════════════════
+        //  PHASE 3: ULTRA DETAIL - SURCHARGE & PONT DE LA MORT
+        // ═══════════════════════════════════════════════════════════
+        
+        const t = tT / 1000;
+        
+        // Cycle d'animation pour le visualiseur : 8 secondes total (6s Laser / 2s Vulnérable)
+        const cycleLength = 8;
+        const localTime = t % cycleLength;
+        const isVuln = localTime > 6; 
+        const transition = isVuln ? (localTime - 6) / 2 : 0; // 0 à 1 pendant la vulnérabilité
+
+        // Tremblement d'écran local pendant le laser
+        if (!isVuln) {
+            cx.save();
+            cx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+        }
+
+        // --- 1. LE VIDE (Fond effondré) ---
+        // Des lignes de code/données qui tombent à toute vitesse vers le bas
+        cx.globalAlpha = 0.4;
+        cx.lineWidth = 1;
+        for (let i = 0; i < 150; i++) {
+            const dropX = (Math.sin(i * 123.45) * 0.5 + 0.5) * W;
+            // Vitesse de chute très rapide
+            const dropY = ((Math.cos(i * 321.12) * 0.5 + 0.5) * H + tT * (0.8 + (i%5)*0.2)) % H;
+            
+            // On ne dessine pas sur le pont central
+            if (dropX > centerX - 100 && dropX < centerX + 100 && dropY > centerY) continue;
+
+            const dropLength = 20 + (i % 30);
+            const grad = cx.createLinearGradient(0, dropY, 0, dropY + dropLength);
+            grad.addColorStop(0, 'rgba(138,43,226,0)');
+            grad.addColorStop(1, 'rgba(0,245,255,0.6)');
+            
+            cx.strokeStyle = grad;
+            cx.beginPath(); cx.moveTo(dropX, dropY); cx.lineTo(dropX, dropY + dropLength); cx.stroke();
+        }
+        cx.globalAlpha = 1;
+
+        // --- 2. LE PONT CENTRAL ---
+        const bridgeWidth = 140;
+        const bridgeTop = centerY + 30;
+        
+        cx.save();
+        // Lueur dorée sous le pont (indique la piste)
+        glow(K.gold, 30);
+        cx.fillStyle = `rgba(15, 5, 20, 0.95)`;
+        cx.fillRect(centerX - bridgeWidth/2, bridgeTop, bridgeWidth, H - bridgeTop);
+        
+        // Bordures du pont (Neon)
+        cx.strokeStyle = isVuln ? K.gold : K.pur;
+        cx.lineWidth = 4;
+        cx.beginPath();
+        cx.moveTo(centerX - bridgeWidth/2, bridgeTop); cx.lineTo(centerX - bridgeWidth/2, H);
+        cx.moveTo(centerX + bridgeWidth/2, bridgeTop); cx.lineTo(centerX + bridgeWidth/2, H);
+        cx.stroke();
+
+        // Grille de perspective sur le pont (qui défile)
+        cx.lineWidth = 1;
+        cx.strokeStyle = `rgba(255, 215, 0, ${isVuln ? 0.4 : 0.1})`;
+        const bOffset = (tT / 4) % 40;
+        for(let y = bridgeTop + bOffset; y < H; y += 40) {
+            cx.beginPath(); cx.moveTo(centerX - bridgeWidth/2, y); cx.lineTo(centerX + bridgeWidth/2, y); cx.stroke();
+        }
+        noGlow();
+        cx.restore();
+
+        // --- 3. LE LASER CONTINU (Quand Invulnérable) ---
+        if (!isVuln) {
+            cx.save();
+            cx.globalCompositeOperation = "screen";
+            
+            // Le laser palpite
+            const beamWidth = bridgeWidth * 0.9 + Math.sin(t * 30) * 10;
+            
+            // Halo Rouge sang
+            glow(K.red, 60);
+            cx.fillStyle = `rgba(255, 0, 60, 0.8)`;
+            cx.fillRect(centerX - beamWidth/2, centerY, beamWidth, H - centerY);
+            
+            // Coeur Blanc pur
+            glow('#fff', 20);
+            cx.fillStyle = '#fff';
+            cx.fillRect(centerX - beamWidth/4, centerY, beamWidth/2, H - centerY);
+
+            // Particules destructrices éjectées du laser
+            cx.fillStyle = K.red;
+            for(let i = 0; i < 20; i++) {
+                const px = centerX + (Math.random() - 0.5) * beamWidth * 1.5;
+                const py = centerY + Math.random() * (H - centerY);
+                const size = Math.random() * 4 + 1;
+                cx.fillRect(px, py, size, size * 3);
+            }
+            cx.restore();
+        } else {
+            // HOLOGRAMME DE VULNÉRABILITÉ SUR LE PONT
+            cx.save();
+            glow(K.gold, 20);
+            cx.font = '900 28px Orbitron';
+            cx.fillStyle = K.gold;
+            cx.textAlign = 'center';
+            cx.globalAlpha = 0.6 + Math.sin(t * 15) * 0.4; // Clignotement d'alerte
+            
+            // Texte étiré verticalement pour donner un effet projeté sur le sol
+            cx.scale(1, 2); 
+            cx.fillText("VULNÉRABLE", centerX, (centerY + 150) / 2);
+            cx.scale(1, 0.5); // Reset scale
+            
+            // Lignes de guidage pour inciter à dasher
+            cx.strokeStyle = K.gold;
+            cx.lineWidth = 2;
+            cx.setLineDash([10, 10]);
+            cx.lineDashOffset = -tT / 5;
+            cx.beginPath(); cx.moveTo(centerX, centerY + 80); cx.lineTo(centerX, H); cx.stroke();
+            cx.restore();
+        }
+
+        // --- 4. LE BOSS (NOYAU EN SURCHAUFFE) ---
+        cx.save();
+        cx.translate(centerX, centerY - 20); // Légèrement surélevé
+
+        if (!isVuln) {
+            // ── ÉTAT INVULNÉRABLE (BOUCLIER ACTIF) ──
+            
+            // Aura sombre et menaçante
+            glow(K.red, 80);
+            cx.fillStyle = `rgba(5, 0, 10, 0.9)`;
+            cx.beginPath(); cx.arc(0, 0, 90, 0, Math.PI*2); cx.fill();
+
+            // Bouclier cranté impénétrable (Rotation rapide)
+            cx.lineWidth = 8;
+            cx.strokeStyle = K.red;
+            cx.save();
+            cx.rotate(t * 2);
+            for(let i=0; i<8; i++) {
+                cx.beginPath();
+                cx.arc(0, 0, 100, (i/8)*Math.PI*2, (i/8)*Math.PI*2 + Math.PI/6);
+                cx.stroke();
+            }
+            cx.restore();
+            
+            // Oeil menaçant qui charge le laser
+            noGlow();
+            cx.fillStyle = K.pur;
+            cx.beginPath(); cx.ellipse(0, 0, 20, 40, 0, 0, Math.PI*2); cx.fill();
+            glow('#fff', 20);
+            cx.fillStyle = '#fff';
+            cx.beginPath(); cx.ellipse(0, Math.random()*4, 5, 25, 0, 0, Math.PI*2); cx.fill();
+
+        } else {
+            // ── ÉTAT VULNÉRABLE (NOYAU EXPOSÉ) ──
+            
+            // Pulsation cardiaque très rapide (panique)
+            const panicPulse = Math.pow(Math.sin(t * 15), 2);
+            cx.scale(1 + panicPulse * 0.1, 1 + panicPulse * 0.1);
+
+            // Aura dorée de surchauffe
+            glow(K.gold, 100 + panicPulse * 50);
+            cx.fillStyle = `rgba(255, 215, 0, 0.2)`;
+            cx.beginPath(); cx.arc(0, 0, 120, 0, Math.PI*2); cx.fill();
+
+            // Le blindage éclaté (Flotte autour)
+            noGlow();
+            cx.fillStyle = '#111';
+            cx.strokeStyle = K.red;
+            cx.lineWidth = 2;
+            for(let i=0; i<8; i++) {
+                cx.save();
+                const a = (i/8) * Math.PI*2 + t;
+                // Les pièces s'écartent
+                const dist = 110 + Math.sin(t*5 + i)*10;
+                cx.translate(Math.cos(a)*dist, Math.sin(a)*dist);
+                cx.rotate(a + Math.PI/2);
+                cx.beginPath(); cx.moveTo(-15, 0); cx.lineTo(0, -25); cx.lineTo(15, 0); cx.fill(); cx.stroke();
+                cx.restore();
+            }
+
+            // Le coeur brut explosé
+            glow(K.gold, 40);
+            cx.fillStyle = '#fff';
+            cx.beginPath();
+            const corePoints = 12;
+            for(let i=0; i<corePoints; i++) {
+                const a = (i/corePoints) * Math.PI*2;
+                const r = 50 + Math.random() * 15 * panicPulse; // Forme chaotique
+                if(i===0) cx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+                else cx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+            }
+            cx.closePath(); cx.fill();
+
+            // L'Oeil affolé et glitché
+            noGlow();
+            cx.fillStyle = '#000';
+            const eyeGlitchX = (Math.random() - 0.5) * 15;
+            const eyeGlitchY = (Math.random() - 0.5) * 15;
+            cx.beginPath(); cx.arc(eyeGlitchX, eyeGlitchY, 15 + Math.random()*5, 0, Math.PI*2); cx.fill();
+            
+            // Croix rouge d'erreur dans l'oeil
+            cx.strokeStyle = K.red; cx.lineWidth = 3;
+            cx.beginPath(); cx.moveTo(eyeGlitchX-10, eyeGlitchY-10); cx.lineTo(eyeGlitchX+10, eyeGlitchY+10); cx.stroke();
+            cx.beginPath(); cx.moveTo(eyeGlitchX+10, eyeGlitchY-10); cx.lineTo(eyeGlitchX-10, eyeGlitchY+10); cx.stroke();
+            
+            // Anneaux de choc émanant du boss (Surchauffe)
+            cx.strokeStyle = `rgba(255, 215, 0, ${1 - transition})`;
+            cx.lineWidth = 2 + (1 - transition)*5;
+            cx.beginPath(); cx.arc(0, 0, 100 + transition * 200, 0, Math.PI*2); cx.stroke();
+        }
+
+        cx.restore();
+
+        // Annulation du tremblement d'écran pour ne pas affecter l'UI
+        if (!isVuln) cx.restore();
+        
+    }
+
+    // Boucle continue
+    requestAnimationFrame(draw);
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FONCTIONS UTILITAIRES DE PRÉSENTATION
+// ═══════════════════════════════════════════════════════════
+
+// Dessine une grille discrète pour t'aider à centrer tes visuels
+function drawHelperGrid() {
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    cx.lineWidth = 1;
+    for(let i=0; i<W; i+=50) { cx.beginPath(); cx.moveTo(i,0); cx.lineTo(i,H); cx.stroke(); }
+    for(let j=0; j<H; j+=50) { cx.beginPath(); cx.moveTo(0,j); cx.lineTo(W,j); cx.stroke(); }
+    
+    // Lignes centrales
+    cx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    cx.beginPath(); cx.moveTo(W/2, 0); cx.lineTo(W/2, H); cx.stroke();
+    cx.beginPath(); cx.moveTo(0, H/2); cx.lineTo(W, H/2); cx.stroke();
+}
+
+// Fonction temporaire pour afficher un texte là où le boss sera dessiné
+function drawPlaceholder(text, color, x, y) {
+    cx.save();
+    glow(color, 20);
+    cx.font = 'bold 24px Orbitron';
+    cx.fillStyle = color;
+    cx.textAlign = 'center';
+    cx.textBaseline = 'middle';
+    
+    // Petit effet de flottement
+    const floatY = y + Math.sin(tT / 300) * 10;
+    
+    cx.fillText(text, x, floatY);
+    
+    // Cercle central pulsant
+    cx.globalAlpha = 0.5 + Math.sin(tT / 200) * 0.2;
+    cx.beginPath();
+    cx.arc(x, floatY + 40, 20, 0, Math.PI * 2);
+    cx.fill();
+    
+    cx.restore();
+    noGlow();
+}
+
+// Démarrage
+requestAnimationFrame(draw);
+
+</script>
+</body>
+</html>

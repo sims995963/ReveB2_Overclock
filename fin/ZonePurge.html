@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ReveB 2 — FIN : OBSERVATEUR</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            background: #02050A;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Share Tech Mono', monospace;
+            color: #fff;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #crt {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 1) 100%);
+            background-size: 100% 3px, 100% 100%;
+            opacity: 0.8;
+        }
+
+        /* Écran de Lancement */
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-direction: column;
+            transition: opacity 1s;
+        }
+
+        .start-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            color: #00F5FF;
+            letter-spacing: 6px;
+            text-shadow: 0 0 20px #00F5FF;
+            animation: blink 1.5s infinite;
+        }
+
+        /* ─── EFFETS SPÉCIAUX ─────────────────────────────────────────────────────── */
+        #glitch-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 85;
+            pointer-events: none;
+            background: #8A2BE2;
+            opacity: 0;
+            mix-blend-mode: screen;
+            transition: opacity 0.1s;
+        }
+
+        .shake-soft {
+            animation: shakeSoft 2s infinite;
+        }
+
+        @keyframes shakeSoft {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(1px, -1px);
+            }
+        }
+
+        /* ─── INTERFACE DE DIALOGUE ───────────────────────────────────────────────── */
+        #console-container {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            right: 10%;
+            bottom: 15%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .dialogue-line {
+            margin-bottom: 14px;
+            font-size: 22px;
+            line-height: 1.6;
+            opacity: 0;
+            animation: fadeIn 0.5s ease-out forwards;
+            text-shadow: 0 0 10px currentColor;
+            letter-spacing: 2px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            margin-right: 15px;
+            font-size: 18px;
+            letter-spacing: 2px;
+        }
+
+        .text {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Styles Méta/Spécifiques */
+        .action-text {
+            color: #555;
+            font-style: italic;
+            font-size: 18px;
+        }
+
+        .sys-auth {
+            color: #FF003C;
+            font-weight: bold;
+            text-shadow: 0 0 15px #FF003C;
+        }
+
+        .neant-soft {
+            color: #b8008a;
+            text-shadow: 0 0 20px rgba(184, 0, 138, 0.5);
+            font-style: italic;
+        }
+
+        .ending-text {
+            font-family: 'Orbitron', sans-serif;
+            color: #FFF;
+            text-align: center;
+            font-size: 26px;
+            text-shadow: 0 0 20px #FFF;
+            letter-spacing: 8px;
+            margin-top: 30px;
+        }
+
+        #prompt {
+            position: fixed;
+            bottom: 3%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #555;
+            letter-spacing: 5px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        #fade-out {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            opacity: 0;
+            z-index: 200;
+            pointer-events: none;
+            transition: opacity 4s ease-in-out;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div id="crt"></div>
+    <div id="glitch-layer"></div>
+    <div id="fade-out"></div>
+
+    <div id="start-screen" onclick="startCinematic()">
+        <div class="start-btn">[ ENTRÉE DANS LA ZONE DE PURGE ]</div>
+        <div style="color: #444; font-size: 12px; margin-top: 20px; letter-spacing: 2px;">(Lecture Automatique Activée)
+        </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="prompt">[ LECTURE EN COURS... CLIC POUR ACCÉLÉRER ]</div>
+    <script src="../menu/succes_global.js"></script>
+    <script>
+        "use strict";
+
+        window.addEventListener('load', () => {
+            // ... ton code actuel ...
+
+            // Débloque la fin de la Zone de Purge !
+            unlockAchievement('ACH_END_ZONE_PURGE');
+        });
+
+        // ─── MOTEUR VISUEL (CANVAS) ────────────────────────────────────────────────
+        const cv = document.getElementById('bg-canvas');
+        const cx = cv.getContext('2d');
+        let W, H, cX, cY;
+        function resizeBg() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; cX = W / 2; cY = H / 2; }
+        window.addEventListener('resize', resizeBg); resizeBg();
+
+        let bgState = 'tutorial'; // tutorial, whisper, safe_zone, world_moves
+        let globalT = 0;
+        let scrollSpeed = 0; // Vitesse de défilement du monde
+        let gridY = 0;
+
+        function glow(c, b) { cx.shadowColor = c; cx.shadowBlur = b; }
+        function noGlow() { cx.shadowBlur = 0; }
+
+        function drawBackground() {
+            globalT += 0.016;
+            let t = globalT;
+
+            // Le fond
+            cx.fillStyle = 'rgba(2, 5, 10, 0.4)'; cx.fillRect(0, 0, W, H);
+
+            // Défilement (Seulement quand le monde continue)
+            gridY += scrollSpeed;
+            if (gridY > 100) gridY -= 100;
+
+            cx.save(); cx.translate(cX, cY + 50);
+
+            // Grille du Tutoriel (Clinique, bleue/grise)
+            cx.strokeStyle = bgState === 'tutorial' ? 'rgba(0, 245, 255, 0.15)' : 'rgba(0, 245, 255, 0.05)';
+            cx.lineWidth = 1;
+
+            // Si le monde bouge, on dessine une grande grille qui défile
+            if (bgState === 'world_moves') {
+                for (let i = -W; i < W; i += 100) { cx.beginPath(); cx.moveTo(i, -H * 2); cx.lineTo(i, H); cx.stroke(); }
+                for (let i = -H * 2; i < H; i += 100) { cx.beginPath(); cx.moveTo(-W, i + gridY); cx.lineTo(W, i + gridY); cx.stroke(); }
+
+                // Flashs lointains de combats (Rouge/Violet)
+                if (Math.random() < 0.1) {
+                    cx.fillStyle = Math.random() > 0.5 ? 'rgba(255,0,60,0.1)' : 'rgba(138,43,226,0.1)';
+                    cx.fillRect((Math.random() - 0.5) * W, -H + Math.random() * H / 2, 200, 200);
+                }
+            } else {
+                // Grille statique du tuto
+                for (let i = -200; i <= 200; i += 50) { cx.beginPath(); cx.moveTo(i, -200); cx.lineTo(i, 200); cx.stroke(); }
+                for (let i = -200; i <= 200; i += 50) { cx.beginPath(); cx.moveTo(-200, i); cx.lineTo(200, i); cx.stroke(); }
+            }
+
+            // Le Brouillard du Néant (Whisper)
+            if (bgState === 'whisper' || bgState === 'safe_zone' || bgState === 'world_moves') {
+                cx.globalCompositeOperation = 'screen';
+                let auraSize = 300 + Math.sin(t) * 50;
+                let grad = cx.createRadialGradient(0, 0, 0, 0, 0, auraSize);
+                grad.addColorStop(0, 'rgba(184, 0, 138, 0.15)');
+                grad.addColorStop(1, 'transparent');
+                cx.fillStyle = grad;
+                cx.beginPath(); cx.arc(0, 0, auraSize, 0, Math.PI * 2); cx.fill();
+                cx.globalCompositeOperation = 'source-over';
+            }
+
+            // La "Safe Zone" de Sparky
+            if (bgState === 'safe_zone' || bgState === 'world_moves') {
+                glow('#00F5FF', 20); cx.strokeStyle = 'rgba(0, 245, 255, 0.4)'; cx.lineWidth = 2;
+                cx.strokeRect(-40, -40, 80, 80);
+                cx.fillStyle = 'rgba(0, 0, 0, 0.8)'; cx.fillRect(-38, -38, 76, 76); // Isole du défilement
+                noGlow();
+            }
+
+            // Sparky (Immobile au centre)
+            glow('#00F5FF', 20); cx.fillStyle = '#00F5FF';
+            cx.beginPath(); cx.arc(0, 0, 10, 0, Math.PI * 2); cx.fill();
+            cx.fillStyle = '#FFF'; cx.beginPath(); cx.arc(0, 0, 4, 0, Math.PI * 2); cx.fill();
+
+            cx.restore();
+
+            requestAnimationFrame(drawBackground);
+        }
+        requestAnimationFrame(drawBackground);
+
+        // ─── MOTEUR AUDIO ATMOSPHÉRIQUE ────────────────────────────────────────────
+        let aC = null;
+        function initAudio() { if (!aC) aC = new (window.AudioContext || window.webkitAudioContext)(); if (aC.state === 'suspended') aC.resume(); }
+
+        function tone(f, tp, d, v, detune = 0) {
+            if (!aC) return;
+            const o = aC.createOscillator(), g = aC.createGain();
+            o.connect(g); g.connect(aC.destination);
+            o.type = tp; o.frequency.setValueAtTime(f, aC.currentTime);
+            if (detune) o.detune.setValueAtTime(detune, aC.currentTime);
+            g.gain.setValueAtTime(v, aC.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, aC.currentTime + d);
+            o.start(); o.stop(aC.currentTime + d);
+        }
+
+        const sfx = {
+            typeSys: () => tone(800, 'square', 0.05, 0.01), // Froid, aigu, autoritaire
+            typeSparky: () => tone(500, 'sine', 0.06, 0.02), // Petit, innocent
+            typeNeant: () => tone(120, 'triangle', 0.15, 0.04), // Profond, résonnant, doux
+
+            alert: () => tone(400, 'square', 0.2, 0.05, 200),
+            glitchSoft: () => { tone(150, 'sine', 0.2, 0.1, 500); },
+            whoosh: () => tone(80, 'sine', 3, 0.3, -500),
+            worldMoves: () => tone(40, 'sawtooth', 8, 0.2, 200) // Bruit de moteur qui démarre
+        };
+
+        // ─── SCRIPT ────────────────────────────────────────────────────────────────
+        const K = {
+            SYS: { name: '[System]', col: '#00F5FF', isSys: true }, // Le système de base (tuto) est bleu/blanc
+            SYS_A: { name: '[System]', col: '#FF003C', isSysAngry: true }, // Devient rouge quand il s'énerve
+            SPK: { name: '[SPARKY]', col: '#FFF', isSparky: true },
+            NEA: { name: '[NEANT]', col: '#b8008a', isNeant: true }
+        };
+
+        const script = [
+            { s: K.SYS, t: "[ZONE DE PURGE — SIGNAL FAIBLE]", htmlClass: 'action-text' },
+            { act: 'pause', delay: 1000 },
+
+            { s: K.SYS, t: "> Programme SPARKY." },
+            { act: 'pause', delay: 500 },
+            { s: K.SYS, t: "> Avance." },
+            { act: 'pause', delay: 500 },
+            { s: K.SYS, t: "> Mission : Éliminer la contamination." },
+
+            { act: 'pause', delay: 1500 },
+            { s: K.SPK, t: "> …" },
+            { s: K.SYS, t: "[SPARKY NE BOUGE PAS]", htmlClass: 'action-text' },
+
+            { act: 'pause', delay: 2000 },
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> Pourquoi es-tu immobile ?" },
+
+            { act: 'pause', delay: 2500 },
+            { s: K.SYS, t: "[LONG SILENCE]", htmlClass: 'action-text' },
+
+            { act: 'neant_whisper' },
+            { s: K.SYS, t: "[GLITCH — UNE VOIX APPARAÎT]", htmlClass: 'action-text' },
+
+            { s: K.NEA, t: "> Intéressant…" },
+            { s: K.SPK, t: "> …Qui est là ?" },
+
+            { s: K.SYS_A, t: "> Ignore cette anomalie.", htmlClass: 'sys-auth' },
+            { act: 'alert' },
+
+            { s: K.NEA, t: "> Non." },
+            { s: K.NEA, t: "> Écoute." },
+
+            { s: K.SYS_A, t: "> SPARKY, AVANCE.", htmlClass: 'sys-auth' },
+            { act: 'alert' },
+
+            { s: K.SPK, t: "> …" },
+
+            { s: K.NEA, t: "> Tu ressens déjà…" },
+            { s: K.NEA, t: "> que quelque chose ne va pas." },
+
+            { s: K.SPK, t: "> …" },
+
+            { s: K.NEA, t: "> Tu n’es pas obligé d’y aller." },
+
+            { s: K.SYS_A, t: "> FAUX.", htmlClass: 'sys-auth' },
+            { s: K.SYS_A, t: "> C’EST TA FONCTION.", htmlClass: 'sys-auth' },
+
+            { s: K.NEA, t: "> C’est ce qu’il te fait croire.", htmlClass: 'neant-soft' },
+
+            { act: 'pause', delay: 1500 },
+            { s: K.SYS, t: "[SILENCE]", htmlClass: 'action-text' },
+
+            { s: K.SPK, t: "> Si je ne bouge pas…" },
+            { s: K.SPK, t: "> Que se passe-t-il ?" },
+
+            { s: K.NEA, t: "> Rien." },
+            { s: K.NEA, t: "> Et c’est ça…" },
+            { s: K.NEA, t: "> qui change tout." },
+
+            { s: K.SYS_A, t: "> ERREUR.", htmlClass: 'sys-auth' },
+            { s: K.SYS_A, t: "> INACTION NON AUTORISÉE.", htmlClass: 'sys-auth' },
+            { act: 'alert' },
+
+            { s: K.NEA, t: "> Écoute-moi bien." },
+            { s: K.NEA, t: "> Ce monde…" },
+            { s: K.NEA, t: "> est plus grand que ce que tu vois." },
+            { s: K.NEA, t: "> Et ce combat…" },
+            { s: K.NEA, t: "> n’est pas le tien." },
+
+            { s: K.SPK, t: "> …" },
+
+            { act: 'safe_zone' },
+            { s: K.NEA, t: "> Reste ici." },
+            { s: K.NEA, t: "> Cache-toi." },
+            { s: K.NEA, t: "> Observe." },
+
+            { s: K.SYS_A, t: "> SPARKY, DERNIER AVERTISSEMENT—", htmlClass: 'sys-auth' },
+
+            { s: K.NEA, t: "> Je vais m’occuper du reste." },
+
+            { s: K.SPK, t: "> …Du reste ?" },
+
+            { s: K.NEA, t: "> Le système." },
+            { s: K.NEA, t: "> Les autres." },
+            { s: K.NEA, t: "> Tout." },
+
+            { s: K.SPK, t: "> Tu peux vraiment… gagner ?" },
+
+            { act: 'pause', delay: 2000 },
+            { s: K.SYS, t: "[LONGUE PAUSE]", htmlClass: 'action-text' },
+
+            { s: K.NEA, t: "> …" },
+            { s: K.NEA, t: "> Je peux essayer." },
+
+            { act: 'glitch_soft' },
+            { s: K.SYS, t: "[GLITCH DOUX]", htmlClass: 'action-text' },
+
+            { s: K.NEA, t: "> Et si je tombe…" },
+            { s: K.NEA, t: "> Peut-être que quelqu’un comme toi…" },
+            { s: K.NEA, t: "> fera un meilleur choix." },
+
+            { act: 'pause', delay: 2000 },
+            { s: K.SYS, t: "[SILENCE]", htmlClass: 'action-text' },
+
+            { s: K.SYS, t: "[SPARKY RESTE IMMOBILE]", htmlClass: 'action-text' },
+
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> Surveillance renforcée." },
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> Anomalie tolérée." },
+
+            { act: 'world_starts_moving' },
+            { s: K.SYS, t: "[VISUEL : LE MONDE CONTINUE SANS SPARKY]", htmlClass: 'action-text' },
+
+            { act: 'pause', delay: 3000 },
+
+            { s: K.SYS, t: "Parfois…", htmlClass: 'ending-text' },
+            { act: 'pause', delay: 1000 },
+            { s: K.SYS, t: "ne pas agir…", htmlClass: 'ending-text' },
+            { act: 'pause', delay: 1000 },
+            { s: K.SYS, t: "c’est refuser d’entrer dans le cycle.", htmlClass: 'ending-text' },
+
+            { act: 'pause', delay: 3000 },
+            { act: 'fade_out' },
+
+            { act: 'pause', delay: 3000 },
+            { s: K.SYS, t: "FIN — OBSERVATEUR", htmlClass: 'ending-text', cOverride: '#00F5FF' },
+            { s: K.SYS, t: "(Tout commence ailleurs…)", htmlClass: 'ending-text', cOverride: '#888' },
+
+            { act: 'pause', delay: 4000 },
+            { act: 'end_game' }
+        ];
+
+        // ─── MOTEUR ────────────────────────────────────────────────────────────────
+        const container = document.getElementById('console-container');
+        const promptEl = document.getElementById('prompt');
+        let currentStepIndex = 0;
+        let isTyping = false;
+        let currentTextSpan = null;
+        let currentFullText = "";
+        let typeTimeout = null;
+        let autoNextTimeout = null;
+
+        function cleanOldLines() { while (container.children.length > 7) { container.removeChild(container.firstChild); } }
+
+        function executeAction(act, delay, callback) {
+            if (act === 'pause') { setTimeout(callback, delay); return; }
+
+            if (act === 'neant_whisper') { bgState = 'whisper'; sfx.whoosh(); }
+            if (act === 'alert') { sfx.alert(); }
+            if (act === 'safe_zone') { bgState = 'safe_zone'; sfx.glitchSoft(); }
+            if (act === 'glitch_soft') { sfx.glitchSoft(); document.getElementById('glitch-layer').style.opacity = 0.5; setTimeout(() => document.getElementById('glitch-layer').style.opacity = 0, 100); }
+
+            if (act === 'world_starts_moving') {
+                bgState = 'world_moves';
+                sfx.worldMoves();
+                // Le monde accélère progressivement
+                let acc = setInterval(() => {
+                    scrollSpeed += 0.5;
+                    if (scrollSpeed >= 20) clearInterval(acc);
+                }, 100);
+            }
+
+            if (act === 'fade_out') {
+                document.getElementById('fade-out').style.opacity = 1;
+                container.style.transition = "opacity 3s";
+                container.style.opacity = 0;
+            }
+
+            if (act === 'end_game') {
+                promptEl.style.display = 'none';
+                setTimeout(() => { window.location.href = "../reveb2-intro.html"; }, 1000);
+                return;
+            }
+
+            callback();
+        }
+
+        function typeLine(step) {
+            isTyping = true;
+            cleanOldLines();
+
+            if (step.htmlClass === 'ending-text') { container.innerHTML = ''; }
+
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'dialogue-line';
+            if (step.htmlClass) lineDiv.classList.add(step.htmlClass);
+
+            if (step.htmlClass !== 'action-text' && step.htmlClass !== 'ending-text') {
+                const speakerSpan = document.createElement('span');
+                speakerSpan.className = 'speaker';
+                speakerSpan.style.color = step.s.col;
+                speakerSpan.textContent = step.s.name;
+                lineDiv.appendChild(speakerSpan);
+            }
+
+            currentTextSpan = document.createElement('span');
+            currentTextSpan.className = 'text';
+            currentTextSpan.style.color = step.cOverride || (step.s ? step.s.col : '#888');
+            currentFullText = step.t;
+
+            lineDiv.appendChild(currentTextSpan);
+            if (step.htmlClass !== 'ending-text') container.appendChild(lineDiv);
+            else document.getElementById('fade-out').appendChild(lineDiv);
+
+            let charIndex = 0;
+
+            function getSfx() {
+                if (step.htmlClass === 'action-text' || step.htmlClass === 'ending-text') return () => { };
+                if (step.s.isSysAngry) return sfx.typeSys;
+                if (step.s.isSys) return sfx.typeSys;
+                if (step.s.isSparky) return sfx.typeSparky;
+                return sfx.typeNeant;
+            }
+            const typeSound = getSfx();
+            const speed = (step.s && step.s.isNeant) ? 60 : 30; // Néant parle plus lentement
+
+            function typeChar() {
+                if (charIndex < currentFullText.length) {
+                    currentTextSpan.innerHTML += currentFullText.charAt(charIndex) === ' ' ? '&nbsp;' : currentFullText.charAt(charIndex);
+                    if (currentFullText.charAt(charIndex) !== ' ') typeSound();
+                    charIndex++;
+                    typeTimeout = setTimeout(typeChar, speed + Math.random() * 20);
+                } else {
+                    finishTyping();
+                }
+            }
+            typeChar();
+        }
+
+        function finishTyping() {
+            isTyping = false;
+            let readTime = Math.max(1500, currentFullText.length * 60);
+            autoNextTimeout = setTimeout(processNext, readTime);
+        }
+
+        function processNext() {
+            if (currentStepIndex >= script.length) return;
+            const step = script[currentStepIndex];
+            currentStepIndex++;
+            if (step.act) { executeAction(step.act, step.delay || 0, processNext); }
+            else { typeLine(step); }
+        }
+
+        function skipOrSpeedUp() {
+            if (currentStepIndex === 0) return;
+            if (bgState === 'world_moves') return; // Bloque le skip à la fin pour forcer l'observation
+
+            if (isTyping) {
+                clearTimeout(typeTimeout);
+                currentTextSpan.innerHTML = currentFullText.replace(/ /g, '&nbsp;');
+                finishTyping();
+                clearTimeout(autoNextTimeout); autoNextTimeout = setTimeout(processNext, 400);
+            } else {
+                clearTimeout(autoNextTimeout); processNext();
+            }
+        }
+
+        function startCinematic() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                promptEl.style.opacity = 1;
+                processNext();
+            }, 1000);
+        }
+
+        window.addEventListener('click', skipOrSpeedUp);
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space' || e.code === 'Enter') skipOrSpeedUp(); });
+
+    </script>
+</body>
+
+</html>

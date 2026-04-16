@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ReveB 2 — PALIER 10 : PHANT0M</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --red: #FF003C;
+      --cyan: #00F5FF;
+      --pur: #8A2BE2;
+      --bg: #010005;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+      color: var(--red);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .13) 50%);
+      background-size: 100% 3px;
+      opacity: .85;
+    }
+
+    #vig {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 38%, rgba(0, 0, 0, .97) 100%);
+    }
+
+    #glitch {
+      position: fixed;
+      inset: 0;
+      z-index: 997;
+      pointer-events: none;
+      background: rgba(255, 0, 60, .25);
+      display: none;
+    }
+
+    #term {
+      position: fixed;
+      bottom: 36px;
+      left: 44px;
+      right: 44px;
+      z-index: 100;
+      font-size: .8rem;
+      line-height: 2;
+      opacity: 1;
+      transition: opacity .6s;
+    }
+
+    .tl {
+      opacity: 0;
+      animation: fi .12s forwards;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tl::before {
+      content: '◈ ';
+      opacity: .45;
+    }
+
+    .tl.warn {
+      color: #FFD700;
+    }
+
+    .tl.warn::before {
+      content: '⚠ ';
+    }
+
+    .tl.crit {
+      color: var(--red);
+      font-weight: bold;
+    }
+
+    .tl.crit::before {
+      content: '✖ ';
+    }
+
+    @keyframes fi {
+      to {
+        opacity: 1
+      }
+    }
+
+    #hud {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      right: 18px;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: .68rem;
+      letter-spacing: 3px;
+      color: rgba(255, 0, 60, .55);
+      opacity: 0;
+      transition: opacity .5s;
+    }
+
+    .hud-col {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hud-col.right {
+      text-align: right;
+    }
+
+    #alert {
+      position: fixed;
+      inset: 0;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .1s;
+    }
+
+    #alert-inner {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 2.5rem;
+      letter-spacing: 10px;
+      color: var(--red);
+      text-shadow: 0 0 40px var(--red), 0 0 80px rgba(255, 0, 60, .4);
+    }
+
+    #alert-sub {
+      font-size: .9rem;
+      letter-spacing: 5px;
+      color: rgba(255, 0, 60, .7);
+      margin-top: 10px;
+    }
+
+    #reveal {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 1.4s;
+      background: radial-gradient(ellipse at center, rgba(100, 0, 20, .15) 0%, transparent 70%);
+    }
+
+    #r-palier {
+      font-size: .82rem;
+      letter-spacing: 10px;
+      color: rgba(255, 0, 60, .7);
+      margin-bottom: 16px;
+    }
+
+    #r-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(3.5rem, 11vw, 8rem);
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 14px;
+      text-shadow: 0 0 50px var(--red), 0 0 120px rgba(255, 0, 60, .5);
+      position: relative;
+      animation: glT .18s infinite alternate;
+    }
+
+    #r-name .ver {
+      position: absolute;
+      right: -48px;
+      top: -14px;
+      font-size: 1.6rem;
+      color: var(--red);
+      font-family: 'Share Tech Mono', monospace;
+      transform: rotate(12deg);
+    }
+
+    #r-sub {
+      font-size: 1rem;
+      letter-spacing: 7px;
+      color: rgba(255, 0, 60, .75);
+      margin-top: 12px;
+    }
+
+    #r-quote {
+      font-size: .78rem;
+      letter-spacing: 2px;
+      color: rgba(255, 80, 80, .55);
+      margin-top: 24px;
+      font-style: italic;
+      max-width: 500px;
+      text-align: center;
+      line-height: 1.8;
+    }
+
+    @keyframes glT {
+      0% {
+        transform: skew(0);
+        text-shadow: 0 0 50px var(--red);
+      }
+
+      100% {
+        transform: skew(-4deg) translateX(5px);
+        text-shadow: 5px 0 var(--cyan), -5px 0 var(--red), 0 0 80px var(--red);
+      }
+    }
+
+    #scan-bar {
+      position: fixed;
+      z-index: 50;
+      pointer-events: none;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: rgba(255, 0, 60, .6);
+      box-shadow: 0 0 20px var(--red), 0 0 40px rgba(255, 0, 60, .3);
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+  <div id="crt"></div>
+  <div id="vig"></div>
+  <div id="glitch"></div>
+  <div id="hud">
+    <div class="hud-col">
+      <span id="h-scan">SCAN ANTIVIRUS : 0%</span>
+      <span id="h-stat">STATUT : EN ANALYSE</span>
+      <span>SECTEUR : 10 // PÉRIPHÉRIE</span>
+    </div>
+    <div class="hud-col right">
+      <span>PROTOCOLE : OMEGA-7</span>
+      <span id="h-thr">MENACE : INDÉFINIE</span>
+      <span>CIBLE : [SCAN...]</span>
+    </div>
+  </div>
+  <div id="scan-bar"></div>
+  <div id="term"></div>
+  <div id="alert">
+    <div id="alert-inner">⚠ ANOMALIE CRITIQUE ⚠</div>
+    <div id="alert-sub">ID_ENTITÉ : SPARK-Y // CLASSE : INCONNUE</div>
+  </div>
+  <div id="reveal">
+    <div id="r-palier">— PALIER 10 —</div>
+    <div id="r-name">PHANT0M</div>
+    <div id="r-sub">PROGRAMME DE SÉCURITÉ ORIGINEL</div>
+    <div id="r-quote">"Tu es une anomalie, SPARK-Y.<br>Et les anomalies... se corrigent."</div>
+  </div>
+  <script>
+    // ── AUDIO ──
+    const au = new (AudioContext || webkitAudioContext)();
+    const tone = (f, tp, d, v = .05, t = 0) => {
+      const o = au.createOscillator(), g = au.createGain();
+      o.connect(g); g.connect(au.destination);
+      o.type = tp; o.frequency.value = f;
+      g.gain.setValueAtTime(v, au.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.0001, au.currentTime + t + d);
+      o.start(au.currentTime + t); o.stop(au.currentTime + t + d);
+    };
+    const sfx = {
+      beep: () => tone(1200, 'square', .04, .02),
+      scan: () => { tone(600, 'sawtooth', .08, .015); tone(900, 'sawtooth', .04, .01, .06); },
+      warn: () => { for (let i = 0; i < 3; i++)tone(800 + i * 80, 'square', .12, .06, i * .18); },
+      detect: () => { tone(220, 'sine', .6, .25); tone(440, 'sine', .4, .12, .3); tone(330, 'triangle', .8, .15, .5); },
+      boom: () => { tone(55, 'sine', 2, .4); tone(80, 'square', .8, .15, .1); tone(110, 'sine', 1, .1, .5); },
+      glitch: () => tone(200 + Math.random() * 600, 'sawtooth', .04, .04),
+      alarm: () => { tone(880, 'square', .1, .08); tone(880, 'square', .1, .08, .2); tone(1100, 'square', .2, .1, .4); }
+    };
+
+    // ── CANVAS ──
+    const cv = document.getElementById('c');
+    const cx = cv.getContext('2d');
+    cv.width = innerWidth; cv.height = innerHeight;
+    const W = cv.width, H = cv.height;
+
+    // Matrix rain (rouge)
+    const FS = 14, COLS = Math.floor(W / FS);
+    const drops = Array.from({ length: COLS }, () => Math.random() * H / FS);
+    const HEX = '0123456789ABCDEF PHANT0M!@#';
+    let matSpeed = 0.8, matAlpha = 0.18;
+
+    function drawMatrix() {
+      cx.font = FS + 'px Share Tech Mono';
+      cx.fillStyle = `rgba(255,0,60,${matAlpha})`;
+      drops.forEach((y, i) => {
+        cx.fillText(HEX[Math.floor(Math.random() * HEX.length)], i * FS, y * FS);
+        drops[i] = (y * FS > H && Math.random() > .97) ? 0 : y + matSpeed;
+      });
+    }
+
+    // Grid
+    function drawGrid(op = .03) {
+      cx.strokeStyle = `rgba(255,0,60,${op})`; cx.lineWidth = .5;
+      for (let x = 0; x < W; x += 50) { cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, H); cx.stroke(); }
+      for (let y = 0; y < H; y += 50) { cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y); cx.stroke(); }
+    }
+
+    // PHANT0M entity
+    let pAlpha = 0, pT = 0;
+    function drawPhantom() {
+      if (pAlpha <= 0) return;
+      cx.save(); cx.translate(W / 2, H / 2 - 30); cx.globalAlpha = pAlpha;
+      const R = 130, glitch = pAlpha > .5 && Math.random() < .08;
+
+      // Outer glow ring
+      const rg = cx.createRadialGradient(0, 0, R * .5, 0, 0, R * 1.5);
+      rg.addColorStop(0, 'rgba(255,0,60,.06)'); rg.addColorStop(1, 'transparent');
+      cx.fillStyle = rg; cx.beginPath(); cx.arc(0, 0, R * 1.5, 0, Math.PI * 2); cx.fill();
+
+      // Octagon
+      cx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 - Math.PI / 8;
+        const jx = glitch ? rng(-6, 6) : 0, jy = glitch ? rng(-4, 4) : 0;
+        i === 0 ? cx.moveTo(Math.cos(a) * R + jx, Math.sin(a) * R + jy) : cx.lineTo(Math.cos(a) * R + jx, Math.sin(a) * R + jy);
+      }
+      cx.closePath();
+      cx.strokeStyle = `rgba(255,0,60,${.6 + Math.sin(pT * .04) * .3})`;
+      cx.lineWidth = 2.5; cx.shadowColor = '#FF003C'; cx.shadowBlur = 25; cx.stroke();
+
+      // Inner rings
+      [.55, .38, .22].forEach((f, i) => {
+        cx.beginPath(); cx.arc(0, 0, R * f + (glitch ? rng(-3, 3) : 0), 0, Math.PI * 2);
+        cx.strokeStyle = `rgba(255,0,60,${.4 - i * .1})`; cx.lineWidth = 1.2; cx.stroke();
+      });
+
+      // Scanning eye pupil (pulsing)
+      const ep = 8 + Math.sin(pT * .06) * 4;
+      cx.beginPath(); cx.arc(0, 0, ep, 0, Math.PI * 2);
+      cx.fillStyle = `rgba(255,0,60,${.8 + Math.sin(pT * .1) * .2})`; cx.shadowBlur = 30; cx.fill();
+      // Iris lines
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + pT * .01;
+        cx.beginPath(); cx.moveTo(Math.cos(a) * ep, Math.sin(a) * ep);
+        cx.lineTo(Math.cos(a) * (R * .3), Math.sin(a) * (R * .3));
+        cx.strokeStyle = 'rgba(255,0,60,.15)'; cx.lineWidth = 1; cx.stroke();
+      }
+
+      // Corner brackets
+      const br = R + 25, bl = 22;
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(([sx, sy]) => {
+        cx.beginPath();
+        cx.moveTo(sx * br, sy * (br - bl)); cx.lineTo(sx * br, sy * br); cx.lineTo(sx * (br - bl), sy * br);
+        cx.strokeStyle = 'rgba(255,0,60,.7)'; cx.lineWidth = 2; cx.shadowBlur = 8; cx.stroke();
+      });
+
+      // Orbiting data nodes
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + pT * .025;
+        const r = R + 45 + Math.sin(pT * .05 + i) * 8;
+        cx.fillStyle = `rgba(255,${i % 2 ? 0 : 60},60,${.6 + Math.sin(pT * .08 + i) * .4})`;
+        cx.shadowBlur = 10;
+        cx.fillRect(Math.cos(a) * r - 2, Math.sin(a) * r - 2, 4, 4);
+      }
+
+      // Horizontal scan lines across face
+      cx.shadowBlur = 0;
+      for (let j = -4; j < 5; j++) {
+        const yo = j * 28 + (pT % 28);
+        if (Math.abs(yo) < R * .85) {
+          const hw = Math.sqrt(Math.max(0, R * R * .72 - yo * yo));
+          cx.beginPath(); cx.moveTo(-hw, yo); cx.lineTo(hw, yo);
+          cx.strokeStyle = 'rgba(255,0,60,.12)'; cx.lineWidth = 1; cx.stroke();
+        }
+      }
+      cx.restore();
+      pT++;
+    }
+
+    // Scanbar position
+    let scanY = 0, scanDir = 1, scanPct = 0;
+    function updateScan() {
+      scanY += scanDir * 2.5;
+      if (scanY > H) { scanDir = -1; scanPct = Math.min(100, scanPct + Math.floor(Math.random() * 15 + 8)); sfx.scan(); }
+      if (scanY < 0) { scanDir = 1; }
+      document.getElementById('scan-bar').style.top = scanY + 'px';
+      document.getElementById('h-scan').textContent = `SCAN ANTIVIRUS : ${scanPct}%`;
+      if (scanPct > 60) document.getElementById('h-thr').textContent = 'MENACE : ÉLEVÉE';
+      if (scanPct > 85) document.getElementById('h-thr').textContent = 'MENACE : ⚠ CRITIQUE';
+    }
+
+    let phase = 0, t = 0;
+    function rng(a, b) { return Math.random() * (b - a) + a; }
+
+    function render() {
+      cx.fillStyle = 'rgba(1,0,5,.12)'; cx.fillRect(0, 0, W, H);
+      drawGrid();
+      drawMatrix();
+      if (phase >= 3) drawPhantom();
+      if (phase >= 1 && phase < 4) updateScan();
+      t++; requestAnimationFrame(render);
+    }
+
+    // ── NARRATIVE ──
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const term = document.getElementById('term');
+    function log(txt, cls = '', delay = 280) {
+      return new Promise(async r => {
+        await wait(delay);
+        const d = document.createElement('div');
+        d.className = 'tl' + (cls ? ' ' + cls : ''); d.textContent = txt;
+        term.appendChild(d);
+        if (term.children.length > 9) { term.removeChild(term.children[0]); }
+        sfx.beep(); r();
+      });
+    }
+
+    async function run() {
+      document.addEventListener('click', () => au.resume(), { once: true });
+      au.resume(); render();
+      await wait(600);
+
+      phase = 1;
+      document.getElementById('hud').style.opacity = '1';
+
+      await log('RÉVEB_OS — PROTOCOLE SURVEILLANCE ACTIF', '', 400);
+      await log('ANALYSE DU SECTEUR 10 EN COURS...', '', 300);
+      await log('ENTITÉ DÉTECTÉE : ID=SPARK-Y [PROTOCOLE_RÉPARATION_v1.2]', 'warn', 350);
+      await log('CLASSIFICATION EN COURS... 23%... 58%... 91%... TERMINÉ', '', 250);
+      await log('RÉSULTAT : ANOMALIE NON-AUTORISÉE — NIVEAU 7', 'crit', 200);
+      await log("MOTIF D'ACCÈS AU SECTEUR 10 : NON DÉCLARÉ", 'warn', 250);
+
+      // Alert flash
+      sfx.alarm();
+      phase = 2;
+      matSpeed = 4; matAlpha = .25;
+      const alertEl = document.getElementById('alert');
+      for (let i = 0; i < 7; i++) {
+        alertEl.style.opacity = i % 2 === 0 ? '1' : '0.2';
+        document.body.style.transform = `translate(${rng(-4, 4)}px,${rng(-2, 2)}px)`;
+        await wait(120);
+      }
+      alertEl.style.opacity = '0'; document.body.style.transform = '';
+
+      await log('RÉPONSE DU SYSTÈME : ACTIVATION PROGRAMME OMEGA-7', 'crit', 150);
+      await log('INITIALISATION DE PHANT0M... CHARGE COMPLÈTE', '', 200);
+
+      // PHANT0M appears
+      sfx.detect();
+      phase = 3; matSpeed = 1.2; matAlpha = .12;
+      const pInterval = setInterval(() => { pAlpha = Math.min(1, pAlpha + .018); if (pAlpha >= 1) clearInterval(pInterval); }, 30);
+
+      await wait(800);
+      await log('"INTRUS IDENTIFIÉ. PROTOCOLE D\'EFFACEMENT INITIÉ."', 'crit', 100);
+      await wait(600);
+      await log('"JE SUIS LE PREMIER VERROU. LE GARDIEN ORIGINEL."', 'crit', 100);
+      await wait(600);
+      await log('"TU AURAIS DÛ RESTER DANS TON COULOIR, SPARK-Y."', 'crit', 100);
+
+      sfx.boom();
+      // Screen shake + glitch
+      document.getElementById('glitch').style.display = 'block';
+      for (let i = 0; i < 15; i++) {
+        document.body.style.transform = `translate(${rng(-10, 10)}px,${rng(-6, 6)}px) skew(${rng(-2, 2)}deg)`;
+        sfx.glitch(); await wait(60);
+      }
+      document.getElementById('glitch').style.display = 'none';
+      document.body.style.transform = '';
+
+      // Reveal
+      phase = 4;
+      term.style.opacity = '0';
+      document.getElementById('scan-bar').style.opacity = '0';
+      matAlpha = .06; matSpeed = .4;
+      await wait(700);
+
+      const rev = document.getElementById('reveal');
+      rev.style.opacity = '1';
+      sfx.boom();
+      await wait(500);
+      sfx.alarm();
+
+      // Hold on reveal, then transition
+      await wait(3800);
+      document.body.style.transition = 'opacity 1.2s';
+      document.body.style.opacity = '0';
+      await wait(1300);
+      window.location.href = '../boss10.html';
+    }
+    run();
+  </script>
+</body>
+
+</html>

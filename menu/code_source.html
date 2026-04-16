@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReveB 2 — [CODE_SOURCE]</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00F5FF;
+      --red: #FF003C;
+      --purple: #8A2BE2;
+      --green: #00FF41;
+      --gold: #FFD700;
+      --bg-dark: #010005;
+      --font-ui: 'Orbitron', sans-serif;
+      --font-term: 'Share Tech Mono', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--cyan);
+      font-family: var(--font-term);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* --- EFFETS VISUELS GLOBAUX --- */
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .15) 50%);
+      background-size: 100% 3px;
+      opacity: 0.6;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.9) 100%);
+    }
+
+    /* --- HEADER & RETOUR --- */
+    header {
+      height: 60px;
+      background: rgba(0, 10, 20, 0.8);
+      border-bottom: 1px solid rgba(0, 245, 255, 0.3);
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      justify-content: space-between;
+      z-index: 100;
+      position: relative;
+    }
+
+    .btn-back {
+      color: var(--cyan);
+      text-decoration: none;
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      font-weight: bold;
+      border: 1px solid var(--cyan);
+      padding: 5px 15px;
+      transition: all 0.2s;
+      cursor: pointer;
+      background: transparent;
+    }
+
+    .btn-back:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 15px var(--cyan);
+    }
+
+    .path-nav {
+      font-size: 0.9rem;
+      opacity: 0.7;
+    }
+
+    .path-nav span {
+      color: var(--gold);
+    }
+
+    /* --- LAYOUT TYPE IDE / ÉDITEUR --- */
+    #main-container {
+      display: flex;
+      height: calc(100vh - 60px);
+      z-index: 10;
+      position: relative;
+    }
+
+    /* Sidebar (Liste des fichiers/catégories) */
+    #sidebar {
+      width: 280px;
+      border-right: 1px solid rgba(0, 245, 255, 0.2);
+      background: rgba(0, 5, 10, 0.5);
+      padding: 20px;
+    }
+
+    .sidebar-title {
+      font-family: var(--font-ui);
+      font-size: 0.7rem;
+      color: #555;
+      margin-bottom: 15px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-bottom: 5px;
+      transition: background 0.2s;
+      font-size: 0.9rem;
+    }
+
+    .file-item:hover {
+      background: rgba(0, 245, 255, 0.1);
+    }
+
+    .file-item.active {
+      background: rgba(0, 245, 255, 0.2);
+      border-left: 2px solid var(--cyan);
+    }
+
+    .file-icon {
+      width: 16px;
+      color: var(--gold);
+    }
+
+    /* Fenêtre de Code Principal */
+    #editor {
+      flex: 1;
+      background: rgba(2, 0, 5, 0.8);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .editor-tabs {
+      height: 35px;
+      background: #050a10;
+      display: flex;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .tab {
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      font-size: 0.8rem;
+      border-right: 1px solid #111;
+      background: #0a1118;
+      color: #666;
+    }
+
+    .tab.active {
+      background: #020005;
+      color: var(--cyan);
+      border-top: 1px solid var(--cyan);
+    }
+
+    .code-content {
+      flex: 1;
+      padding: 30px;
+      overflow-y: auto;
+      line-height: 1.6;
+      font-size: 1.05rem;
+      color: #d1d1d1;
+    }
+
+    /* Couleurs Syntaxe */
+    .keyword {
+      color: var(--purple);
+    }
+
+    .function {
+      color: var(--cyan);
+    }
+
+    .string {
+      color: var(--gold);
+    }
+
+    .comment {
+      color: #5c6370;
+      font-style: italic;
+    }
+
+    .const {
+      color: var(--red);
+    }
+
+    .name-val {
+      color: var(--green);
+      font-weight: bold;
+    }
+
+    /* Scrollbar */
+    .code-content::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .code-content::-webkit-scrollbar-thumb {
+      background: rgba(0, 245, 255, 0.2);
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="crt"></div>
+  <div id="vignette"></div>
+
+  <header>
+    <div style="display: flex; align-items: center; gap: 20px;">
+      <button class="btn-back" onclick="window.location.href='../reveb2-intro.html'">[ RETOUR ]</button>
+      <div class="path-nav">root / sys / <span>contributors.log</span></div>
+    </div>
+    <div style="font-size: 0.7rem; opacity: 0.5;">STATUS: READ_ONLY</div>
+  </header>
+
+  <div id="main-container">
+    <div id="sidebar">
+      <div class="sidebar-title">Explorateur</div>
+
+      <div class="file-item active">
+        <span class="file-icon">📄</span> contributors.log
+      </div>
+      <div class="file-item">
+        <span class="file-icon">📄</span> engine_tech.js
+      </div>
+      <div class="file-item">
+        <span class="file-icon">📄</span> audio_core.wav
+      </div>
+      <div class="file-item">
+        <span class="file-icon">📄</span> license.txt
+      </div>
+      <div class="file-item">
+        <span class="file-icon">📄</span> patch_notes.md
+      </div>
+
+      <div class="sidebar-title" style="margin-top:30px;">Système</div>
+      <div style="font-size: 0.8rem; opacity: 0.4; padding: 10px;">
+        Kernel: v2.0.50<br>
+        Host: OriginDev_SRV
+      </div>
+    </div>
+
+    <div id="editor">
+      <div class="editor-tabs">
+        <div class="tab active">contributors.log</div>
+        <div class="tab">engine_tech.js</div>
+      </div>
+
+      <div class="code-content">
+        <span class="comment">// RÉVÉB 2.0 : OVERCLOCK — ARCHIVES DES DÉVELOPPEURS</span><br><br>
+
+        <span class="keyword">export const</span> <span class="function">GameInfo</span> = {<br>
+        &nbsp;&nbsp;title: <span class="string">"ReveB 2 : Overclock"</span>,<br>
+        &nbsp;&nbsp;version: <span class="string">"2.0.6-Final"</span>,<br>
+        &nbsp;&nbsp;status: <span class="name-val">"STABLE"</span><br>
+        };<br><br>
+
+        <span class="keyword">const</span> <span class="function">CoreTeam</span> = [<br>
+        &nbsp;&nbsp;{<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;role: <span class="string">"Architecte Original & Code"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;alias: <span class="name-val">"Feisthauer Simon"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;note: <span class="comment">// A survécu à la corruption du palier 50.</span><br>
+        &nbsp;&nbsp;},<br>
+        &nbsp;&nbsp;{<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;role: <span class="string">"Design de l'Interface (OS)"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;alias: <span class="name-val">"Gemini_Protocol"</span>,<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;note: <span class="comment">// Logique des particules et scanner radar.</span><br>
+        &nbsp;&nbsp;}<br>
+        ];<br><br>
+
+        <span class="keyword">const</span> <span class="function">RessourcesExternes</span> = {<br>
+        &nbsp;&nbsp;fonts: [<span class="string">"Orbitron"</span>, <span class="string">"Share Tech Mono"</span>, <span
+          class="string">"Bangers"</span>],<br>
+        &nbsp;&nbsp;engines: <span class="string">"Vanilla JavaScript & Canvas 2D"</span>,<br>
+        &nbsp;&nbsp;logic: <span class="string">"Rogue-like procédural"</span><br>
+        };<br><br>
+
+        <span class="comment">// ---------------------------------------------------------</span><br>
+        <span class="comment">// REMERCIEMENTS SPÉCIAUX</span><br>
+        <span class="keyword">function</span> <span class="function">remercierJoueur</span>() {<br>
+        &nbsp;&nbsp;<span class="keyword">if</span> (joueur.aTerminéLaSimulation) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"Merci d'avoir 'jouer' au
+          jeu"</span>;<br>
+        &nbsp;&nbsp;} <span class="keyword">else</span> {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">return</span> <span class="string">"Faites les bon
+          choix"</span>;<br>
+        &nbsp;&nbsp;}<br>
+        }<br><br>
+
+        <span class="keyword">console</span>.<span class="function">log</span>(<span
+          class="function">remercierJoueur</span>());<br>
+        <span class="comment">// FIN DU FICHIER</span>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Animation de texte au chargement (effet terminal)
+    const codeBox = document.querySelector('.code-content');
+    codeBox.style.opacity = '0';
+
+    window.onload = () => {
+      codeBox.style.transition = 'opacity 1.5s ease-in';
+      codeBox.style.opacity = '1';
+
+      // Petit effet sonore si possible
+      // sfx.boot();
+    };
+
+    // On peut rajouter de la logique pour changer de fichier dans la sidebar si besoin
+    document.querySelectorAll('.file-item').forEach(item => {
+      item.onclick = function () {
+        document.querySelectorAll('.file-item').forEach(f => f.classList.remove('active'));
+        this.classList.add('active');
+      };
+    });
+  </script>
+
+</body>
+
+</html>

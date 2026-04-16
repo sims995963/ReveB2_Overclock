@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ReveB 2 — PALIER 20 : SYNC & ASYNC</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00F5FF;
+      --amber: #FF8C00;
+      --pur: #8A2BE2;
+      --bg: #010005;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      overflow: hidden;
+      font-family: 'Share Tech Mono', monospace;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .12) 50%);
+      background-size: 100% 3px;
+      opacity: .85;
+    }
+
+    #vig {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 38%, rgba(0, 0, 0, .97) 100%);
+    }
+
+    #glitch {
+      position: fixed;
+      inset: 0;
+      z-index: 997;
+      pointer-events: none;
+      display: none;
+    }
+
+    /* Split divider */
+    #divider {
+      position: fixed;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      z-index: 50;
+      background: linear-gradient(to bottom, transparent, rgba(138, 43, 226, .8), transparent);
+      box-shadow: 0 0 20px rgba(138, 43, 226, .5);
+      transition: opacity .8s, box-shadow 1s;
+      pointer-events: none;
+    }
+
+    /* Dialogue twin */
+    #dlg-sync {
+      position: fixed;
+      bottom: 80px;
+      left: 20px;
+      width: 40vw;
+      z-index: 200;
+      border-left: 3px solid var(--cyan);
+      padding: 14px 18px;
+      background: rgba(0, 10, 20, .88);
+      opacity: 0;
+      transition: opacity .4s;
+    }
+
+    #dlg-async {
+      position: fixed;
+      bottom: 80px;
+      right: 20px;
+      width: 40vw;
+      z-index: 200;
+      border-right: 3px solid var(--amber);
+      padding: 14px 18px;
+      text-align: right;
+      background: rgba(20, 10, 0, .88);
+      opacity: 0;
+      transition: opacity .4s;
+    }
+
+    #dlg-both {
+      position: fixed;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 60vw;
+      z-index: 200;
+      border: 1px solid rgba(138, 43, 226, .6);
+      padding: 16px 22px;
+      background: rgba(5, 0, 15, .92);
+      text-align: center;
+      opacity: 0;
+      transition: opacity .4s;
+    }
+
+    .dlg-name {
+      font-size: .65rem;
+      letter-spacing: .18em;
+      margin-bottom: 8px;
+    }
+
+    .sync-name {
+      color: var(--cyan);
+    }
+
+    .async-name {
+      color: var(--amber);
+    }
+
+    .both-name {
+      color: #fff;
+    }
+
+    .dlg-text {
+      font-size: .82rem;
+      line-height: 1.8;
+      letter-spacing: .04em;
+    }
+
+    .sync-text {
+      color: rgba(0, 245, 255, .9);
+    }
+
+    .async-text {
+      color: rgba(255, 140, 0, .9);
+    }
+
+    .both-text {
+      color: #fff;
+      font-size: .88rem;
+    }
+
+    #hud {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      right: 18px;
+      z-index: 100;
+      display: flex;
+      justify-content: space-between;
+      font-size: .68rem;
+      letter-spacing: 3px;
+      opacity: 0;
+      transition: opacity .5s;
+    }
+
+    #hud-s {
+      color: rgba(0, 245, 255, .5);
+    }
+
+    #hud-a {
+      color: rgba(255, 140, 0, .5);
+      text-align: right;
+    }
+
+    #hud-mid {
+      color: rgba(138, 43, 226, .5);
+      text-align: center;
+    }
+
+    #reveal {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 1.4s;
+    }
+
+    #r-palier {
+      font-size: .82rem;
+      letter-spacing: 10px;
+      color: rgba(138, 43, 226, .7);
+      margin-bottom: 16px;
+    }
+
+    #r-names {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    #r-sync {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2.5rem, 7vw, 5.5rem);
+      font-weight: 900;
+      color: var(--cyan);
+      text-shadow: 0 0 40px var(--cyan), 0 0 100px rgba(0, 245, 255, .3);
+      letter-spacing: 6px;
+      animation: glS .2s infinite alternate;
+    }
+
+    #r-sep {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2rem, 5vw, 4rem);
+      color: #fff;
+      opacity: .4;
+      margin: 0 6px;
+    }
+
+    #r-async {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2.5rem, 7vw, 5.5rem);
+      font-weight: 900;
+      color: var(--amber);
+      text-shadow: 0 0 40px var(--amber), 0 0 100px rgba(255, 140, 0, .3);
+      letter-spacing: 6px;
+      animation: glA .2s infinite alternate;
+    }
+
+    #r-sub {
+      font-size: .88rem;
+      letter-spacing: 6px;
+      color: rgba(138, 43, 226, .75);
+      margin-top: 14px;
+    }
+
+    #r-quote {
+      font-size: .75rem;
+      letter-spacing: 1.5px;
+      margin-top: 22px;
+      text-align: center;
+      line-height: 2;
+      max-width: 550px;
+    }
+
+    .q-sync {
+      color: rgba(0, 245, 255, .55);
+    }
+
+    .q-async {
+      color: rgba(255, 140, 0, .55);
+    }
+
+    @keyframes glS {
+      0% {
+        transform: skew(0);
+      }
+
+      100% {
+        transform: skew(-3deg) translateX(-4px);
+        text-shadow: 4px 0 var(--amber), -4px 0 var(--cyan), 0 0 80px var(--cyan);
+      }
+    }
+
+    @keyframes glA {
+      0% {
+        transform: skew(0);
+      }
+
+      100% {
+        transform: skew(3deg) translateX(4px);
+        text-shadow: -4px 0 var(--cyan), 4px 0 var(--amber), 0 0 80px var(--amber);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+  <div id="crt"></div>
+  <div id="vig"></div>
+  <div id="glitch"></div>
+  <div id="divider"></div>
+  <div id="hud">
+    <div id="hud-s">SYNC // STABILITÉ : 100%<br>FRÉQUENCE : 440.000 Hz<br>PHASE : +0.000°</div>
+    <div id="hud-mid">INTERFACE CRYPTOGRAPHIQUE<br>SECTEUR 20 // ZONE D'HARMONIE</div>
+    <div id="hud-a">ASYNC // LATENCE : 0ms<br>FRÉQUENCE : 440.000 Hz<br>DÉCALAGE : +0.000ms</div>
+  </div>
+  <div id="dlg-sync">
+    <div class="dlg-name sync-name">[ SYNC ]</div>
+    <div class="dlg-text sync-text" id="s-txt"></div>
+  </div>
+  <div id="dlg-async">
+    <div class="dlg-name async-name">[ ASYNC ]</div>
+    <div class="dlg-text async-text" id="a-txt"></div>
+  </div>
+  <div id="dlg-both">
+    <div class="dlg-name both-name">[ SYNC &amp; ASYNC ]</div>
+    <div class="dlg-text both-text" id="b-txt"></div>
+  </div>
+  <div id="reveal">
+    <div id="r-palier">— PALIER 20 —</div>
+    <div id="r-names">
+      <div id="r-sync">SYNC</div>
+      <div id="r-sep">&amp;</div>
+      <div id="r-async">ASYNC</div>
+    </div>
+    <div id="r-sub">JUMEAUX CRYPTOGRAPHIQUES DE L'INTERFACE</div>
+    <div id="r-quote">
+      <span class="q-sync">"Notre harmonie est absolue."</span><br>
+      <span class="q-async">"Ta dissonance... est une offense."</span><br>
+      <span style="color:rgba(255,255,255,.35)">[ ENSEMBLE ] "NOUS SOMMES L'ÉQUILIBRE. TU ES LE CHAOS."</span>
+    </div>
+  </div>
+  <script>
+    // ── AUDIO ──
+    const au = new (AudioContext || webkitAudioContext)();
+    function tone(f, tp, d, v = .05, t = 0, dest = au.destination) {
+      const o = au.createOscillator(), g = au.createGain();
+      o.connect(g); g.connect(dest);
+      o.type = tp; o.frequency.value = f;
+      g.gain.setValueAtTime(v, au.currentTime + t);
+      g.gain.exponentialRampToValueAtTime(.0001, au.currentTime + t + d);
+      o.start(au.currentTime + t); o.stop(au.currentTime + t + d);
+    }
+    function chord(freqs, d, v = .06) { freqs.forEach(f => tone(f, 'sine', d, v)); }
+    const sfx = {
+      harmonic: () => chord([220, 330, 440, 660], .8, .03),
+      sync: () => { tone(523, 'sine', .3, .06); tone(659, 'sine', .3, .04, .15); tone(784, 'sine', .3, .03, .3); },
+      async_: () => { tone(523, 'sine', .3, .06); tone(622, 'sine', .3, .04, .15); tone(698, 'sine', .3, .03, .3); },
+      dissonance: () => { tone(440, 'sawtooth', .4, .04); tone(466, 'sawtooth', .4, .04, .05); },
+      boom: () => { tone(60, 'sine', 2, .4); tone(90, 'square', .8, .1, .2); },
+      glitch: () => tone(200 + Math.random() * 800, 'square', .03, .04),
+      both: () => { chord([440, 554, 659], .6, .05); },
+    };
+
+    // ── CANVAS ──
+    const cv = document.getElementById('c'), cx = cv.getContext('2d');
+    cv.width = innerWidth; cv.height = innerHeight;
+    const W = cv.width, H = cv.height, CX = W / 2, CY = H / 2;
+
+    // Wave state
+    let waveT = 0, diverge = 0, syncCol = 'rgba(0,245,255,', asyncCol = 'rgba(255,140,0,';
+    let bossAlpha = 0, phase = 0;
+    const pts = 120;
+
+    function drawWave(side, amp, freq, phaseOff, col, alpha, yOff = 0) {
+      cx.beginPath();
+      for (let i = 0; i <= pts; i++) {
+        const x = (i / pts) * W;
+        const y = CY + yOff + Math.sin((i / pts) * Math.PI * 2 * freq + phaseOff + waveT * .03) * amp;
+        i === 0 ? cx.moveTo(x, y) : cx.lineTo(x, y);
+      }
+      cx.strokeStyle = col + alpha + ')';
+      cx.lineWidth = 2;
+      cx.shadowColor = col + '1)'; cx.shadowBlur = 12;
+      cx.stroke(); cx.shadowBlur = 0;
+    }
+
+    // Twin entity shapes
+    function drawEntity(side, alpha, divergeAmt) {
+      if (alpha <= 0) return;
+      const sx = side === 'sync' ? CX - 180 : CX + 180;
+      const col = side === 'sync' ? 'rgba(0,245,255,' : 'rgba(255,140,0,';
+      cx.save(); cx.translate(sx, CY - 20); cx.globalAlpha = alpha;
+
+      // Core circle
+      const r = 50 + Math.sin(waveT * .05) * 8;
+      const gr = cx.createRadialGradient(0, 0, 0, 0, 0, r);
+      gr.addColorStop(0, col + '.15)'); gr.addColorStop(1, col + '0)');
+      cx.fillStyle = gr; cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI * 2); cx.fill();
+
+      // Rings
+      for (let i = 3; i > 0; i--) {
+        const ri = r * (i / 3);
+        cx.beginPath(); cx.arc(0, 0, ri, 0, Math.PI * 2);
+        cx.strokeStyle = col + ((.15 + i * .1) * (1 + Math.sin(waveT * .04 + i) * .2)) + ')';
+        cx.lineWidth = 1.5; cx.shadowColor = col + '1)'; cx.shadowBlur = 8; cx.stroke();
+      }
+
+      // Radiating lines (like sound rays)
+      const lineCount = 12;
+      for (let i = 0; i < lineCount; i++) {
+        const a = (i / lineCount) * Math.PI * 2 + waveT * .01 * (side === 'sync' ? 1 : -1);
+        const ri = r + 10 + Math.sin(waveT * .08 + i * 1.3) * 20;
+        const ro = r + 60 + Math.sin(waveT * .06 + i) * 30;
+        cx.beginPath(); cx.moveTo(Math.cos(a) * ri, Math.sin(a) * ri);
+        cx.lineTo(Math.cos(a) * ro, Math.sin(a) * ro);
+        cx.strokeStyle = col + '.25)'; cx.lineWidth = 1; cx.stroke();
+      }
+
+      // Mirror symbol
+      if (side === 'sync') {
+        // Left bracket
+        cx.strokeStyle = col + '.7)'; cx.lineWidth = 2; cx.shadowBlur = 10;
+        cx.beginPath(); cx.moveTo(-20, -15); cx.lineTo(-30, -15); cx.lineTo(-30, 15); cx.lineTo(-20, 15); cx.stroke();
+      } else {
+        // Right bracket (mirror)
+        cx.strokeStyle = col + '.7)'; cx.lineWidth = 2; cx.shadowBlur = 10;
+        cx.beginPath(); cx.moveTo(20, -15); cx.lineTo(30, -15); cx.lineTo(30, 15); cx.lineTo(20, 15); cx.stroke();
+      }
+      cx.shadowBlur = 0;
+      cx.restore();
+    }
+
+    // Connection arc between twins
+    function drawConnection(alpha) {
+      if (alpha <= 0) return;
+      cx.save(); cx.globalAlpha = alpha;
+      const y = CY - 20;
+      cx.beginPath(); cx.moveTo(CX - 130, y);
+      cx.bezierCurveTo(CX - 60, y - 60, CX + 60, y - 60, CX + 130, y);
+      const grad = cx.createLinearGradient(CX - 130, y, CX + 130, y);
+      grad.addColorStop(0, syncCol + '1)'); grad.addColorStop(.5, 'rgba(138,43,226,1)'); grad.addColorStop(1, asyncCol + '1)');
+      cx.strokeStyle = grad; cx.lineWidth = 1.5; cx.shadowColor = '#8A2BE2'; cx.shadowBlur = 15; cx.stroke();
+      cx.shadowBlur = 0; cx.restore();
+    }
+
+    // Background particle field
+    const particles = Array.from({ length: 80 }, () => ({
+      x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .2, vy: (Math.random() - .5) * .2,
+      side: Math.random() < .5 ? 's' : 'a', life: Math.random()
+    }));
+    function drawParticles() {
+      particles.forEach(p => {
+        p.x += p.vx + (p.side === 's' ? -.1 : .1); p.y += p.vy; p.life += .005;
+        if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) { p.x = Math.random() * W; p.y = Math.random() * H; p.life = 0; }
+        const col = p.side === 's' ? syncCol : asyncCol;
+        cx.fillStyle = col + (.2 + Math.sin(p.life * Math.PI) * .15) + ')';
+        cx.fillRect(p.x - 1, p.y - 1, 2, 2);
+      });
+    }
+
+    // Grid split
+    function drawGrid() {
+      cx.strokeStyle = 'rgba(0,245,255,.02)'; cx.lineWidth = .5;
+      for (let x = 0; x < CX; x += 50) { cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, H); cx.stroke(); }
+      cx.strokeStyle = 'rgba(255,140,0,.02)';
+      for (let x = CX; x < W; x += 50) { cx.beginPath(); cx.moveTo(x, 0); cx.lineTo(x, H); cx.stroke(); }
+      for (let y = 0; y < H; y += 50) {
+        cx.beginPath(); cx.moveTo(0, y); cx.lineTo(W, y);
+        cx.strokeStyle = 'rgba(138,43,226,.02)'; cx.stroke();
+      }
+    }
+
+    const rng = (a, b) => Math.random() * (b - a) + a;
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    let connectionAlpha = 0;
+
+    function render() {
+      cx.fillStyle = 'rgba(1,0,5,.12)'; cx.fillRect(0, 0, W, H);
+      drawGrid(); drawParticles();
+
+      const div = diverge;
+
+      // Sync waves (upper half of center)
+      for (let i = 3; i > 0; i--) {
+        drawWave('sync', 20 + i * 12, 1.5 + i * .3, 0, syncCol, .04 + i * .02, -div * 30 - i * 8);
+        drawWave('sync', 15 + i * 8, 3, .5, syncCol, .03 + i * .015, -div * 30 - i * 8);
+      }
+      drawWave('sync', 30 + Math.sin(waveT * .02) * 10, 2, 0, syncCol, .8, -div * 30);
+
+      // Async waves (mirror, diverging)
+      for (let i = 3; i > 0; i--) {
+        drawWave('async', 20 + i * 12, 1.5 + i * .3, Math.PI * div, asyncCol, .04 + i * .02, div * 30 + i * 8);
+        drawWave('async', 15 + i * 8, 3, .5 + Math.PI * div, asyncCol, .03 + i * .015, div * 30 + i * 8);
+      }
+      drawWave('async', 30 + Math.sin(waveT * .02) * 10, 2, Math.PI * div, asyncCol, .8, div * 30);
+
+      if (phase >= 2) { drawConnection(connectionAlpha); }
+      if (phase >= 3) {
+        drawEntity('sync', bossAlpha, div);
+        drawEntity('async', bossAlpha, div);
+      }
+
+      waveT++;
+      requestAnimationFrame(render);
+    }
+
+    // ── Dialogue helpers ──
+    function showSync(txt) {
+      const el = document.getElementById('dlg-sync');
+      document.getElementById('s-txt').textContent = txt;
+      el.style.opacity = '1';
+      return wait(200);
+    }
+    function hideSync() { document.getElementById('dlg-sync').style.opacity = '0'; return wait(300); }
+    function showAsync(txt) {
+      const el = document.getElementById('dlg-async');
+      document.getElementById('a-txt').textContent = txt;
+      el.style.opacity = '1';
+      return wait(200);
+    }
+    function hideAsync() { document.getElementById('dlg-async').style.opacity = '0'; return wait(300); }
+    function showBoth(txt) {
+      const el = document.getElementById('dlg-both');
+      document.getElementById('b-txt').textContent = txt;
+      el.style.opacity = '1';
+      sfx.both(); return wait(200);
+    }
+    function hideBoth() { document.getElementById('dlg-both').style.opacity = '0'; return wait(300); }
+
+    async function run() {
+      document.addEventListener('click', () => au.resume(), { once: true });
+      au.resume(); render();
+      await wait(500);
+
+      // Phase 1: Harmony intro
+      phase = 1;
+      sfx.harmonic();
+      document.getElementById('hud').style.opacity = '1';
+      document.getElementById('divider').style.opacity = '1';
+      await wait(1000);
+
+      // Sync speaks first
+      await showSync("Notre harmonie dure depuis 1 247 cycles.");
+      sfx.sync(); await wait(1800);
+      await hideSync();
+
+      await showAsync("Chaque bit parfaitement aligné. Chaque pulse en phase.");
+      sfx.async_(); await wait(1800);
+      await hideAsync();
+
+      await showBoth("CE SECTEUR EST UN SANCTUAIRE. AUCUNE ANOMALIE N'A JAMAIS FRANCHI CE SEUIL.");
+      await wait(2200);
+      await hideBoth();
+
+      // Phase 2: Detect Sparky — divergence begins
+      phase = 2;
+      sfx.dissonance();
+      connectionAlpha = .8;
+
+      // HUD updates
+      document.getElementById('hud-s').innerHTML = 'SYNC // STABILITÉ : 98%<br>FRÉQUENCE : 440.001 Hz<br>PHASE : +0.003°';
+      document.getElementById('hud-a').innerHTML = 'ASYNC // LATENCE : 2ms<br>FRÉQUENCE : 439.998 Hz<br>DÉCALAGE : +0.002ms';
+
+      await wait(400);
+      const divInterval = setInterval(() => { diverge = Math.min(1, diverge + .008); }, 30);
+
+      await showSync("...Détection. Signal parasite. Secteur d'entrée.");
+      sfx.sync(); await wait(1600); await hideSync();
+
+      await showAsync("Identification : SPARK-Y. Protocole Réparation.");
+      sfx.async_(); await wait(1600); await hideAsync();
+
+      await showSync("Un protocole de réparation... qui répare des boss ?");
+      sfx.sync(); await wait(1600); await hideSync();
+
+      await showAsync("La logique est... dissonante. Cela me dérange.");
+      sfx.async_(); await wait(1600); await hideAsync();
+
+      // Max divergence
+      clearInterval(divInterval); diverge = 1;
+      sfx.dissonance(); sfx.boom();
+
+      // Screen shake
+      for (let i = 0; i < 8; i++) {
+        document.body.style.transform = `translate(${rng(-7, 7)}px,${rng(-4, 4)}px)`;
+        sfx.glitch(); await wait(80);
+      }
+      document.body.style.transform = '';
+
+      document.getElementById('hud-s').innerHTML = 'SYNC // STABILITÉ : ⚠ DISSONANCE<br>FRÉQUENCE : 444.000 Hz<br>PHASE : +0.000°';
+      document.getElementById('hud-a').innerHTML = 'ASYNC // LATENCE : 12ms<br>FRÉQUENCE : 436.000 Hz<br>DÉCALAGE : +8.000ms';
+
+      // Phase 3: Boss reveal
+      phase = 3;
+      const bInterval = setInterval(() => { bossAlpha = Math.min(1, bossAlpha + .02); if (bossAlpha >= 1) clearInterval(bInterval); }, 30);
+      connectionAlpha = 0;
+
+      await wait(600);
+      await showBoth("ASSEZ. NOUS N'ALLONS PAS DÉBATTRE DE TA LOGIQUE.");
+      sfx.both(); await wait(2000); await hideBoth();
+
+      await showSync("Je suis SYNC. L'harmonie est ma raison d'être.");
+      sfx.sync(); await wait(1600); await hideSync();
+
+      await showAsync("Je suis ASYNC. Et ta présence est... une cacophonie.");
+      sfx.async_(); await wait(1600); await hideAsync();
+
+      await wait(400);
+      sfx.dissonance(); sfx.boom();
+
+      await showBoth("TU N'ES QU'UNE ERREUR DE CODE, SPARK-Y. NOUS ALLONS TE RÉÉCRIRE.");
+      await wait(2400); await hideBoth();
+
+      // Final glitch
+      const glitch = document.getElementById('glitch');
+      for (let i = 0; i < 3; i++) {
+        glitch.style.background = i % 2 === 0 ? 'rgba(0,245,255,.2)' : 'rgba(255,140,0,.2)';
+        glitch.style.display = 'block';
+        document.body.style.transform = `translate(${rng(-12, 12)}px,0) skew(${rng(-3, 3)}deg)`;
+        sfx.glitch(); await wait(100);
+        glitch.style.display = 'none'; document.body.style.transform = ''; await wait(80);
+      }
+
+      // Reveal
+      phase = 4;
+      document.getElementById('dlg-sync').style.opacity = '0';
+      document.getElementById('dlg-async').style.opacity = '0';
+      document.getElementById('hud').style.opacity = '0';
+      document.getElementById('divider').style.opacity = '0';
+      await wait(800);
+
+      const rev = document.getElementById('reveal');
+      rev.style.opacity = '1';
+      sfx.boom(); sfx.both();
+
+      await wait(4200);
+      document.body.style.transition = 'opacity 1.2s'; document.body.style.opacity = '0';
+      await wait(1300);
+      window.location.href = '../boss20.html';
+    }
+    run();
+  </script>
+</body>
+
+</html>

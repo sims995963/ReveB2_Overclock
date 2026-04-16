@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Maquette - Le Cerveau du Néant</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100vw; height: 100vh; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; }
+    canvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+    
+    /* Effet d'écran cathodique léger */
+    #crt { position: fixed; inset: 0; z-index: 10; pointer-events: none; background: linear-gradient(rgba(18,16,16,0) 50%, rgba(0,0,0,0.2) 50%), linear-gradient(90deg, rgba(255,0,60,0.03), rgba(0,255,255,0.02), rgba(255,0,60,0.03)); background-size: 100% 3px, 3px 100%; }
+    
+    /* Interface de la maquette */
+    #ui { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; gap: 20px; }
+    button { background: rgba(10, 0, 20, 0.8); border: 2px solid #FFF; color: #FFF; padding: 10px 20px; font-family: 'Orbitron'; font-size: 16px; cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 2px; }
+    button:hover { background: #FFF; color: #000; box-shadow: 0 0 20px #FFF; }
+    button.active { border-color: #FF003C; color: #FF003C; box-shadow: 0 0 15px rgba(255, 0, 60, 0.5); }
+    button.active-b { border-color: #00F5FF; color: #00F5FF; box-shadow: 0 0 15px rgba(0, 245, 255, 0.5); }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+
+<div id="ui">
+    <button id="btnA" class="active" onclick="setVariant('A')">Variante A : Organique</button>
+    <button id="btnB" onclick="setVariant('B')">Variante B : Quantique</button>
+</div>
+
+<script>
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+let W, H;
+function resize() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+let variant = 'A'; // Choix par défaut
+function setVariant(v) {
+    variant = v;
+    document.getElementById('btnA').className = v === 'A' ? 'active' : '';
+    document.getElementById('btnB').className = v === 'B' ? 'active-b' : '';
+}
+
+// Outils de dessin
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+
+// Position fictive de la souris pour suivre le curseur
+let mx = W/2, my = H/2;
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+// ═══════════════════════════════════════════════════════════════
+// VARIANTE A : LE CAUCHEMAR ORGANIQUE (Viande, Œil, Rouge/Violet)
+// ═══════════════════════════════════════════════════════════════
+function drawVariantA(t) {
+    const bX = W / 2, bY = H / 2 - 50;
+
+    // 1. Fond : Tunnel de chair / Synapses
+    cx.fillStyle = '#050002'; cx.fillRect(0, 0, W, H);
+    cx.save(); cx.translate(bX, bY);
+    cx.globalCompositeOperation = 'screen';
+    
+    for (let r = 1; r < 6; r++) {
+        let scale = (t * 0.5 + r) % 6; 
+        cx.save(); cx.scale(scale, scale); cx.rotate(t * 0.05 * (r%2===0?1:-1));
+        
+        cx.strokeStyle = `rgba(138, 43, 226, ${0.2 * (1 - scale/6)})`;
+        cx.lineWidth = 1.5;
+        cx.beginPath();
+        for (let i = 0; i < Math.PI * 2; i += 0.2) {
+            let wave = Math.sin(i * 10 + t * 5) * 10; // Effet organique ondulant
+            cx.moveTo(Math.cos(i) * 50, Math.sin(i) * 50);
+            cx.quadraticCurveTo(Math.cos(i+0.1)*(200+wave), Math.sin(i+0.1)*(200+wave), Math.cos(i)*400, Math.sin(i)*400);
+        }
+        cx.stroke();
+        
+        // Vaisseaux sanguins rouges
+        cx.strokeStyle = `rgba(255, 0, 60, ${0.15 * (1 - scale/6)})`;
+        cx.beginPath(); cx.arc(0, 0, 150 + Math.sin(t*3)*10, 0, Math.PI*2); cx.stroke();
+        cx.restore();
+    }
+    cx.globalCompositeOperation = 'source-over'; cx.restore();
+
+    // 2. Le Boss : L'Oeil Cauchemardesque
+    cx.save(); cx.translate(bX, bY);
+    let beat = 1 + Math.sin(t * 6) * 0.08; // Rythme cardiaque lourd
+    cx.scale(beat, beat);
+
+    // Coquille de chair noire/violette
+    glow('#8A2BE2', 40);
+    cx.fillStyle = '#0a0005'; cx.strokeStyle = '#8A2BE2'; cx.lineWidth = 4;
+    cx.beginPath();
+    for (let i = 0; i < Math.PI * 2; i += 0.3) {
+        let rad = 90 + Math.sin(i * 5 + t * 4) * 15; // Pointes organiques
+        if (i === 0) cx.moveTo(Math.cos(i) * rad, Math.sin(i) * rad);
+        else cx.lineTo(Math.cos(i) * rad, Math.sin(i) * rad);
+    }
+    cx.closePath(); cx.fill(); cx.stroke();
+
+    // L'Oeil qui regarde la souris
+    let lookX = (mx - bX) * 0.05;
+    let lookY = (my - bY) * 0.05;
+    
+    glow('#FF003C', 30);
+    cx.fillStyle = '#330000'; // Sclérotique sombre
+    cx.beginPath(); cx.ellipse(0, 0, 45, 25 + Math.sin(t*2)*5, 0, 0, Math.PI*2); cx.fill();
+    cx.strokeStyle = '#FF003C'; cx.lineWidth = 3; cx.stroke();
+    
+    // Iris et Pupille fendue (reptile)
+    cx.save(); cx.translate(Math.max(-15, Math.min(15, lookX)), Math.max(-10, Math.min(10, lookY)));
+    cx.fillStyle = '#FF003C'; cx.beginPath(); cx.arc(0, 0, 15, 0, Math.PI*2); cx.fill();
+    cx.fillStyle = '#000'; cx.beginPath(); cx.ellipse(0, 0, 3, 12 + Math.sin(t*5)*3, 0, 0, Math.PI*2); cx.fill();
+    cx.restore();
+
+    cx.restore(); noGlow();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// VARIANTE B : LE PRISME QUANTIQUE (Géométrie, Néo-Cyber, Cyan/Magenta)
+// ═══════════════════════════════════════════════════════════════
+function drawVariantB(t) {
+    const bX = W / 2, bY = H / 2 - 50;
+
+    // 1. Fond : Grille Matrix / Hyperespace
+    cx.fillStyle = '#000511'; cx.fillRect(0, 0, W, H);
+    cx.save(); cx.translate(bX, bY);
+    cx.globalCompositeOperation = 'screen';
+    
+    for (let r = 1; r < 6; r++) {
+        let scale = (t * 0.8 + r) % 6; 
+        cx.save(); cx.scale(scale, scale); cx.rotate(t * 0.2 * (r%2===0?1:-1));
+        
+        cx.strokeStyle = `rgba(0, 245, 255, ${0.15 * (1 - scale/6)})`;
+        cx.lineWidth = 1;
+        
+        // Hexagones imbriqués (Géométrie sacrée)
+        cx.beginPath();
+        for(let i=0; i<=6; i++) {
+            let a = i * Math.PI / 3;
+            if(i===0) cx.moveTo(Math.cos(a)*200, Math.sin(a)*200);
+            else cx.lineTo(Math.cos(a)*200, Math.sin(a)*200);
+        }
+        cx.stroke();
+        
+        // Lignes de fuite fuyantes
+        cx.strokeStyle = `rgba(255, 0, 255, ${0.1 * (1 - scale/6)})`;
+        cx.beginPath();
+        for (let i = 0; i < Math.PI * 2; i += Math.PI/4) {
+            cx.moveTo(Math.cos(i)*50, Math.sin(i)*50);
+            cx.lineTo(Math.cos(i)*600, Math.sin(i)*600);
+        }
+        cx.stroke();
+        cx.restore();
+    }
+    cx.globalCompositeOperation = 'source-over'; cx.restore();
+
+    // 2. Le Boss : Le Tesseract Divin
+    cx.save(); cx.translate(bX, bY);
+    
+    // Aura de lumière pure
+    glow('#00F5FF', 50);
+    cx.fillStyle = '#FFF'; cx.beginPath(); cx.arc(0, 0, 15 + Math.sin(t*10)*5, 0, Math.PI*2); cx.fill();
+    
+    // Anneaux runiques rotatifs
+    cx.lineWidth = 2;
+    cx.save(); cx.rotate(t);
+    cx.strokeStyle = '#00F5FF'; cx.setLineDash([20, 10, 5, 10]);
+    cx.beginPath(); cx.arc(0, 0, 70, 0, Math.PI*2); cx.stroke(); cx.restore();
+    
+    cx.save(); cx.rotate(-t * 1.5);
+    cx.strokeStyle = '#FF00FF'; cx.setLineDash([40, 20]);
+    cx.beginPath(); cx.arc(0, 0, 90, 0, Math.PI*2); cx.stroke(); cx.restore();
+    cx.setLineDash([]);
+
+    // Structure du Tesseract (Deux cubes tournants décalés)
+    glow('#FFFFFF', 20);
+    cx.strokeStyle = '#FFFFFF'; cx.lineWidth = 3;
+    
+    cx.save(); cx.rotate(t * 0.5);
+    cx.strokeRect(-40, -40, 80, 80);
+    cx.restore();
+    
+    cx.save(); cx.rotate(t * 0.5 + Math.PI/4); // Décalé de 45 degrés
+    cx.strokeStyle = '#00F5FF';
+    cx.strokeRect(-50, -50, 100, 100);
+    cx.restore();
+
+    cx.restore(); noGlow();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ÉLÉMENT COMMUN : LE JOUEUR (Forme d'énergie pure)
+// ═══════════════════════════════════════════════════════════════
+function drawPlayer(t) {
+    const ox = W / 2, oy = H - 80; // Fixé en bas
+    const pAng = Math.atan2(my - oy, mx - ox); // Pointe vers la souris
+
+    cx.save(); cx.translate(ox, oy); cx.rotate(pAng);
+    
+    // Flèche de lumière cyan
+    glow('#00FFFF', 30); 
+    cx.fillStyle = 'rgba(0, 255, 255, 0.4)';
+    cx.beginPath(); cx.moveTo(-30, 0); cx.lineTo(-60 - Math.random()*20, 12); cx.lineTo(-45, 0); cx.lineTo(-60 - Math.random()*20, -12); cx.closePath(); cx.fill();
+    
+    cx.fillStyle = '#FFFFFF';
+    cx.beginPath(); cx.moveTo(25, 0); cx.lineTo(-15, 15); cx.lineTo(-5, 0); cx.lineTo(-15, -15); cx.closePath(); cx.fill();
+    
+    cx.restore(); noGlow();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOUCLE D'ANIMATION
+// ═══════════════════════════════════════════════════════════════
+function loop(ts) {
+    const t = ts / 1000;
+    cx.clearRect(0, 0, W, H);
+    
+    if (variant === 'A') drawVariantA(t);
+    else drawVariantB(t);
+    
+    drawPlayer(t);
+
+    // Dessin d'une fausse barre de vie pour le contexte
+    const barW = 500, barH = 15;
+    cx.fillStyle = variant === 'A' ? 'rgba(255, 0, 60, 0.2)' : 'rgba(0, 245, 255, 0.2)';
+    cx.fillRect(W/2 - barW/2, 30, barW, barH);
+    cx.fillStyle = variant === 'A' ? '#FF003C' : '#00F5FF';
+    glow(cx.fillStyle, 15); cx.fillRect(W/2 - barW/2, 30, barW * 0.7, barH);
+    cx.strokeStyle = '#FFF'; cx.lineWidth = 2; noGlow(); cx.strokeRect(W/2 - barW/2, 30, barW, barH);
+
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

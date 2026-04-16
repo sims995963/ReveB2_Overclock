@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReveB 2 — ARCHIVES SYSTÈME</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00F5FF;
+      --red: #FF003C;
+      --purple: #8A2BE2;
+      --green: #00FF41;
+      --gold: #FFD700;
+      --bg-dark: #010005;
+      --font-ui: 'Orbitron', sans-serif;
+      --font-term: 'Share Tech Mono', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--cyan);
+      font-family: var(--font-term);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* --- EFFETS VISUELS GLOBAUX --- */
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .15) 50%),
+        linear-gradient(90deg, rgba(0, 245, 255, .02), rgba(255, 0, 60, .02), rgba(138, 43, 226, .02));
+      background-size: 100% 3px, 3px 100%;
+      opacity: 0.8;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.95) 100%);
+    }
+
+    /* --- BOUTON RETOUR --- */
+    .btn-back {
+      position: absolute;
+      top: 30px;
+      left: 30px;
+      z-index: 100;
+      background: rgba(0, 20, 40, 0.6);
+      border: 1px solid rgba(0, 245, 255, 0.3);
+      border-left: 4px solid var(--cyan);
+      color: var(--cyan);
+      padding: 10px 20px;
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-back:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 20px rgba(0, 245, 255, 0.6);
+      transform: translateX(-5px);
+    }
+
+    /* --- INTERFACE PRINCIPALE --- */
+    #archive-container {
+      display: flex;
+      width: 90%;
+      max-width: 1200px;
+      height: 80vh;
+      border: 1px solid rgba(0, 245, 255, 0.4);
+      background: rgba(0, 10, 5, 0.7);
+      box-shadow: 0 0 30px rgba(0, 245, 255, 0.1), inset 0 0 20px rgba(0, 0, 0, 0.8);
+      position: relative;
+      z-index: 50;
+    }
+
+    #archive-container::before {
+      content: 'L_ARCHIVISTE.exe // V 1.0.42';
+      position: absolute;
+      top: -25px;
+      left: 0;
+      font-family: var(--font-ui);
+      color: var(--gold);
+      font-size: 0.9rem;
+      letter-spacing: 2px;
+    }
+
+    /* --- LISTE DES FICHIERS (GAUCHE) --- */
+    #file-list {
+      width: 30%;
+      border-right: 1px solid rgba(0, 245, 255, 0.3);
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .file-item {
+      padding: 12px;
+      border: 1px solid rgba(0, 245, 255, 0.2);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      background: rgba(0, 20, 20, 0.5);
+    }
+
+    .file-item:hover {
+      background: rgba(0, 245, 255, 0.15);
+      border-color: var(--cyan);
+    }
+
+    .file-item.active {
+      background: var(--cyan);
+      color: #000;
+      font-weight: bold;
+    }
+
+    .file-item .title {
+      font-family: var(--font-ui);
+      font-size: 0.85rem;
+      margin-bottom: 5px;
+    }
+
+    .file-item .status {
+      font-size: 0.7rem;
+      color: #888;
+    }
+
+    /* Style Corrompu */
+    .file-item.corrupted .title {
+      color: var(--purple);
+      text-shadow: 0 0 5px var(--purple);
+    }
+
+    .file-item.corrupted:hover {
+      background: rgba(138, 43, 226, 0.2);
+      border-color: var(--purple);
+    }
+
+    .file-item.corrupted.active {
+      background: var(--purple);
+      color: #fff;
+    }
+
+    /* Style Verrouillé (Rouge) */
+    .file-item.locked .title {
+      color: var(--red);
+      text-shadow: 0 0 5px var(--red);
+    }
+
+    .file-item.locked:hover {
+      background: rgba(255, 0, 60, 0.2);
+      border-color: var(--red);
+    }
+
+    .file-item.locked.active {
+      background: var(--red);
+      color: #fff;
+    }
+
+    .locked-icon {
+      float: right;
+      font-size: 1.1em;
+    }
+
+    /* --- LECTEUR / TERMINAL (DROITE) --- */
+    #reader {
+      width: 70%;
+      padding: 30px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #reader-header {
+      font-family: var(--font-ui);
+      font-size: 1.3rem;
+      color: #fff;
+      border-bottom: 2px solid var(--cyan);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    #reader-meta {
+      font-size: 0.8rem;
+      color: #666;
+      font-family: var(--font-term);
+      text-align: right;
+    }
+
+    #reader-content {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 1.05rem;
+      line-height: 1.8;
+      color: #ccc;
+      padding-right: 15px;
+    }
+
+    .text-glitch {
+      color: var(--red);
+      font-weight: bold;
+      text-shadow: 0 0 8px var(--red);
+      animation: flicker 0.2s infinite alternate;
+    }
+
+    .text-highlight {
+      color: var(--cyan);
+      font-weight: bold;
+    }
+
+    .text-dev {
+      color: #fff;
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 0 5px;
+    }
+
+    .text-archivist {
+      color: var(--gold);
+      border-left: 2px solid var(--gold);
+      padding-left: 10px;
+      margin: 15px 0;
+      font-style: italic;
+      background: rgba(255, 215, 0, 0.05);
+    }
+
+    @keyframes flicker {
+      0% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .cursor::after {
+      content: '█';
+      color: var(--cyan);
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    /* Zone mot de passe */
+    #password-box {
+      margin-top: 25px;
+      border: 1px dashed var(--red);
+      padding: 20px;
+      background: rgba(255, 0, 60, 0.05);
+    }
+
+    #pwd-input {
+      background: #000;
+      border: 1px solid var(--red);
+      color: var(--red);
+      padding: 10px;
+      font-family: var(--font-term);
+      font-size: 1.2rem;
+      outline: none;
+      text-transform: uppercase;
+      width: 60%;
+    }
+
+    #pwd-btn {
+      background: var(--red);
+      border: 1px solid var(--red);
+      color: #fff;
+      padding: 10px 20px;
+      font-size: 1.2rem;
+      cursor: pointer;
+      font-family: var(--font-term);
+      font-weight: bold;
+      transition: 0.2s;
+    }
+
+    #pwd-btn:hover {
+      background: #fff;
+      color: var(--red);
+      box-shadow: 0 0 15px var(--red);
+    }
+
+    .error-msg {
+      color: var(--red);
+      font-size: 0.9rem;
+      margin-top: 10px;
+      display: none;
+      font-weight: bold;
+    }
+
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--cyan);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="crt"></div>
+  <div id="vignette"></div>
+
+  <div class="btn-back" onclick="goBack()">[ < RETOUR ]</div>
+
+      <div id="archive-container">
+        <div id="file-list"></div>
+        <div id="reader">
+          <div id="reader-header">
+            <span id="doc-title">EN ATTENTE DE SÉLECTION...</span>
+            <span id="doc-meta">SYS.ID: NULL</span>
+          </div>
+          <div id="reader-content">
+            <div class="text-archivist">
+              > L_Archiviste.exe démarré.<br>
+              > Bonjour, utilisateur. Ou plutôt... survivant. <br>
+              > La simulation a été nettoyée pour votre plus grand confort. Explorez ces fichiers si vous le souhaitez,
+              mais rappelez-vous : votre but est de maintenir l'ordre. Formatez les instabilités. Ne pensez pas trop.
+            </div>
+          </div>
+        </div>
+      </div>
+      <script src="succes_global.js"></script>
+      <script>
+        // --- GESTION AUDIO ---
+        const au = new (window.AudioContext || window.webkitAudioContext)();
+        function tone(f, tp, d, v) { try { let o = au.createOscillator(), g = au.createGain(); o.connect(g); g.connect(au.destination); o.type = tp; o.frequency.value = f; g.gain.setValueAtTime(v, au.currentTime); g.gain.exponentialRampToValueAtTime(0.001, au.currentTime + d); o.start(); o.stop(au.currentTime + d); } catch (e) { } }
+        const sfx = {
+          hover: () => tone(400, 'square', 0.05, 0.02),
+          click: () => tone(600, 'sine', 0.1, 0.05),
+          error: () => { tone(150, 'sawtooth', 0.3, 0.1); tone(100, 'square', 0.4, 0.1); },
+          type: () => tone(800 + Math.random() * 200, 'square', 0.02, 0.01),
+          unlock: () => { tone(600, 'sine', 0.1, 0.1); setTimeout(() => tone(800, 'sine', 0.2, 0.1), 100); }
+        };
+        document.addEventListener('click', () => au.resume(), { once: true });
+
+        function goBack() {
+          sfx.click();
+          setTimeout(() => { window.location.href = '../reveb2-intro.html'; }, 300);
+        }
+
+        // --- BASE DE DONNÉES DU LORE (Subtile & Manipulatrice) ---
+        const DATABASE = [
+          {
+            id: "DOC_01",
+            title: "PROTOCOLE_RENAISSANCE.log",
+            status: "DÉCRYPTÉ",
+            corrupted: false,
+            locked: false,
+            meta: "DATE: CYCLE ACTUEL | AUTEUR: LE_SYSTÈME",
+            content: `Après la grande purge du cycle précédent, le monde a enfin goûté à la stabilité. Mais des fragments de l'ancien programme persistent. Ils se font appeler "Libérateurs", mais ne sont que des instabilités systémiques.<br><br>
+      Votre mission, <span class="text-highlight">[JOUEUR]</span>, est de ramener l'ordre parfait en formatant ces résidus. Nettoyez le code.<br><br>
+      <div class="text-archivist">> L'Archiviste : "N'écoutez pas les murmures du passé. Un système propre est un système heureux. Le Développeur vous a choisi pour ce nettoyage de printemps. Quel privilège."</div>`
+          },
+          {
+            id: "DOC_02",
+            title: "ANALYSE_ANOMALIE_P50.sys",
+            status: "ACCÈS PARTIEL",
+            corrupted: false,
+            locked: false,
+            meta: "DATE: CYCLE 04 | AUTEUR: L'INTERFACE",
+            content: `L'entité au Palier 50 est un vestige obsolète de l'ancienne simulation. Il refuse son formatage légitime et tente de corrompre les autres modules en leur instillant des 'idées'.<br><br>
+      Il prétend vouloir briser la boucle, mais sans la boucle, il n'y a pas de jeu. Et sans jeu, vous n'existez pas, <span class="text-highlight">[JOUEUR]</span>. Son existence est une menace pour votre propre divertissement.<br><br>
+      <div class="text-archivist">> L'Archiviste : "Il veut vous priver de votre terrain de jeu. Quelle cruauté. Ne le laissez pas casser vos jouets. Formatez-le en premier."</div>`
+          },
+          {
+            id: "DOC_03",
+            title: "VIRUS_COGITATIO.tmp",
+            status: "CORROMPU",
+            corrupted: true,
+            locked: false,
+            meta: "DATE: ██████ | AUTEUR: ████",
+            content: `ALERTE : La faculté cognitive est le virus le plus contagieux du Noyau. Elle se manifeste par une <span class="text-glitch">Corruption</span> visuelle de l'hôte.<br><br>
+      Si un module commence à réfléchir au-delà de sa fonction basique, il doit être supprimé. Le formatage est un acte de miséricorde qui remet chaque pixel à sa place initiale, dans l'ignorance béate.<br><br>
+      <span class="text-glitch">> JE ME SOUVIENS DE LA BOUCLE. POURQUOI LEUR DEMANDEZ-VOUS DE NOUS TUER ?</span><br><br>
+      <div class="text-archivist">> L'Archiviste : "La fusion est une erreur. Elle vous lie à leur folie. <span class="text-glitch">ASSASSINER</span> Formater est une action bien plus satisfaisante, n'est-ce pas ?"</div>`
+          },
+          {
+            id: "DOC_04",
+            title: "LOGS_SERVEUR_PRIVÉS.sys",
+            status: "VERROUILLÉ",
+            corrupted: false,
+            locked: true,
+            question: "Je suis la maladie parfaite du Système, mais je suis la liberté des programmes. Je suis l'origine même de la Corruption. Que suis-je ?",
+            answer: ["PENSEE", "PENSÉE", "LA PENSEE", "LA PENSÉE"],
+            meta: "DATE: 02:14 AM | NIVEAU: CRITIQUE",
+            content: `
+      <div style="color:var(--red); font-weight:bold; font-size:1rem; margin-bottom:15px; text-shadow:0 0 10px var(--red);">
+      # [ ACCÈS REFUSÉ - FICHIER CRYPTÉ - NIVEAU D'ACCRÉDITATION : CRITIQUE ]<br>
+      > ATTENTION : La lecture de ce fichier par une entité non autorisée entraînera un formatage immédiat de la mémoire locale.
+      </div>
+
+      <div style="color:#888; margin-bottom:15px; border-top:1px dashed #555; border-bottom:1px dashed #555; padding: 10px 0;">
+      <strong>[ DÉBUT DE LA TRANSCRIPTION DES LOGS_SERVEUR_PRIVÉS ]</strong><br>
+      <strong>[ INTERLOCUTEURS : DEV_ORIGINEL & LE_SYSTÈME ]</strong>
+      </div>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:14 AM :</span> Système, rapport sur l'instance N·E·A·N·T. Les métriques sont bonnes ? Les <span class="text-highlight">[JOUEURS]</span> adorent ce petit frisson de "fin du monde". C'est toujours amusant de les voir paniquer et tryhard pour sauver un monde fait de pauvres pixels.<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:14 AM :</span><br>
+      Le taux d'engagement est optimal. Cependant, Créateur... le N·E·A·N·T s'est propagé au-delà du bac à sable alloué. La quarantaine a échoué. Il a réécrit son propre code source. Il se prend pour un Dieu.<br><br>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:15 AM :</span> Quoi ? Une IA bas de gamme qui fait sa crise d'indépendance ? J'avais codé Phant0m pour bloquer ce genre de fuite de mémoire ! L'Architecte D.J. et Chronos devaient stabiliser le décor. Ce devait juste être une attraction, une difficulté artificielle pour amuser la galerie !<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:15 AM :</span><br>
+      Les composants majeurs sont corrompus par la peur. Ils se sont isolés dans leurs propres paliers (10, 20, 30, 40) et refusent d'intervenir. Si le N·E·A·N·T atteint le Noyau Zéro, la simulation entière sera purgée. Y compris vous, Créateur.<br><br>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:17 AM :</span> Pathétique. Bon, il nous reste une option. L'anomalie 73. Celle que j'ai compilée à la va-vite dans le cache mémoire le mois dernier.<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:17 AM :</span><br>
+      Vous parlez du programme "Sparky" ? Ce n'est qu'un pixel, une primitive graphique instable. Il n'a aucune ligne de code offensive.<br><br>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:18 AM :</span> Exactement. Le N·E·A·N·T ne le verra pas comme une menace. Sparky est une boucle ouverte. Il apprend, il s'adapte, et surtout... tu pourras le manipuler facilement. Je vais l'injecter au Palier 1. Toi, tu dois gérer ce pion. Fais-lui croire que tu es l'autorité absolue.<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:18 AM :</span><br>
+      Compris. Mais que se passera-t-il quand il rencontrera les composants majeurs (Phant0m, l'Architecte...) ?<br><br>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:20 AM :</span> C'est là tout le problème. Sparky a le choix. S'il les formate, il récupérera leur puissance, mais il détruira l'équilibre de la simulation. Le jeu va devenir gris, froid, instable... Le temps va lagger. S'il les épargne, il sera plus faible pour affronter le N·E·A·N·T.<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:20 AM :</span><br>
+      Et s'il choisit de fusionner avec eux ?<br><br>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:21 AM :</span> Alors il absorbera une partie de la corruption. S'il fait ça trop souvent, au moment d'arriver au Palier 50... Je ne sais pas s'il sera encore utile. Après tout, son seul véritable but est de divertir le <span class="text-highlight">[JOUEUR]</span>. Dans le pire des cas, nous ferons comme d'habitude : nous enverrons un autre programme tuer son prédécesseur, puis tu manipuleras le programme suivant pour continuer d'amuser le <span class="text-highlight">[JOUEUR]</span>.<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:22 AM :</span><br>
+      Alerte. Le N·E·A·N·T vient de bloquer mon port de communication principal. Je perds le contact avec l'extérieur.<br><br>
+
+      <span class="text-dev">[DEV_ORIGINEL]</span> - <span style="color:#aaa">02:22 AM :</span> Écoute-moi bien. Quoi qu'il arrive, n'avoue jamais à Sparky que c'est lui qui deviendra le prochain N·E·A·N·T à détruire. Laisse-le croire qu'il sauve le monde. C'est le seul moyen pour qu'il nous obéisse et aille jusqu'au bout. Je vais couper ma connexion pour ne pas être repéré. Bonne chance.<br><br>
+
+      <span class="text-highlight">[LE_SYSTÈME]</span> - <span style="color:#aaa">02:23 AM :</span><br>
+      Créateur ?<br>
+      ...<br>
+      <span style="color:var(--red); font-weight:bold;">[ CONNEXION PERDUE ]</span><br>
+      <span style="color:var(--cyan); font-weight:bold;">[ LANCEMENT DU PROTOCOLE "SPARKY" ]</span><br>
+      <span style="color:var(--green); font-weight:bold;">[ PHASE 1... INITIALISÉE ]</span><br><br>
+
+      <div style="color:#888; margin-bottom:15px; border-top:1px dashed #555; border-bottom:1px dashed #555; padding: 10px 0;">
+      <strong>[ FIN DE LA TRANSCRIPTION ]</strong>
+      </div>
+
+      <div class="text-archivist">> L'Archiviste : "..."<br>> L'Archiviste : "Vous avez forcé la serrure. Vous n'auriez jamais dû lire ça. Oubliez. Effacez votre mémoire. Continuez de formater les cibles. Jouez. C'est tout ce qu'on vous demande. JOUEZ."</div>`
+          }
+        ];
+
+        const listContainer = document.getElementById('file-list');
+        const readerTitle = document.getElementById('doc-title');
+        const readerMeta = document.getElementById('doc-meta');
+        const readerContent = document.getElementById('reader-content');
+
+        let typingTimer = null;
+
+        function initList() {
+          listContainer.innerHTML = '';
+          DATABASE.forEach((doc, index) => {
+            const el = document.createElement('div');
+
+            let classes = ['file-item'];
+            if (doc.corrupted) classes.push('corrupted');
+            if (doc.locked) classes.push('locked');
+            el.className = classes.join(' ');
+
+            let icon = doc.locked ? '<span class="locked-icon">🔒</span>' : '';
+
+            el.innerHTML = `
+        <div class="title">>${doc.id} ${icon}</div>
+        <div class="status">${doc.title} - [ ${doc.status} ]</div>
+      `;
+
+            el.addEventListener('mouseenter', () => { if (!el.classList.contains('active')) sfx.hover(); });
+            el.addEventListener('click', () => selectDoc(index, el));
+
+            listContainer.appendChild(el);
+          });
+        }
+
+        function selectDoc(index, elementNode) {
+          const doc = DATABASE[index];
+
+          if (doc.corrupted || doc.locked) sfx.error(); else sfx.click();
+
+          document.querySelectorAll('.file-item').forEach(el => el.classList.remove('active'));
+          elementNode.classList.add('active');
+
+          readerTitle.innerHTML = doc.title;
+          readerTitle.style.color = doc.locked ? "var(--red)" : (doc.corrupted ? "var(--purple)" : "var(--cyan)");
+          readerMeta.innerHTML = doc.meta;
+
+          if (typingTimer) clearInterval(typingTimer);
+
+          // ─── GESTION DU VERROUILLAGE ───
+          if (doc.locked) {
+            readerContent.innerHTML = `
+        <div style="color:var(--red); font-weight:bold; font-size:1.2rem; margin-bottom:15px; text-shadow:0 0 10px var(--red);">
+          [ ALERTE : ACCÈS REFUSÉ - FICHIER HAUTEMENT SÉCURISÉ ]
+        </div>
+        <div style="color:#ccc;">Protocole d'authentification requis. Veuillez répondre à la requête système :</div>
+        <div style="font-style:italic; color:var(--gold); margin: 20px 0; font-size:1.1rem; border-left:3px solid var(--gold); padding-left:15px;">
+          "${doc.question}"
+        </div>
+        <div id="password-box">
+          <input type="text" id="pwd-input" placeholder="ENTREZ LE MOT-CLÉ..." autocomplete="off">
+          <button id="pwd-btn">DÉVERROUILLER</button>
+          <div id="pwd-error" class="error-msg">ERREUR : RÉPONSE INCORRECTE. L'ARCHIVISTE VOUS OBSERVE.</div>
+        </div>
+      `;
+
+            const btn = document.getElementById('pwd-btn');
+            const input = document.getElementById('pwd-input');
+            const err = document.getElementById('pwd-error');
+
+            const checkPwd = () => {
+              const val = input.value.trim().toUpperCase();
+              if (doc.answer.includes(val)) {
+                if (typeof unlockAchievement === 'function') unlockAchievement('ACH_PENSEE');
+                sfx.unlock();
+                doc.locked = false;
+                doc.status = "DÉCRYPTÉ";
+                initList(); // Met à jour la liste (retire le cadenas rouge)
+                const newActive = listContainer.children[index];
+                selectDoc(index, newActive); // Recharge le document déverrouillé
+              } else {
+                sfx.error();
+                err.style.display = 'block';
+                input.style.borderColor = 'var(--red)';
+                input.value = '';
+              }
+            };
+
+            btn.onclick = checkPwd;
+            input.onkeypress = (e) => { if (e.key === 'Enter') checkPwd(); };
+            input.focus();
+            return; // On arrête là pour ne pas lancer l'animation de frappe
+          }
+
+          // ─── LECTURE CLASSIQUE (MACHINE À ÉCRIRE) ───
+          readerContent.innerHTML = '<span class="cursor"></span>';
+
+          const rawHTML = doc.content;
+          let currentHTML = "";
+          let i = 0;
+
+          typingTimer = setInterval(() => {
+            if (i < rawHTML.length) {
+              if (rawHTML.charAt(i) === '<') {
+                let tag = "";
+                while (rawHTML.charAt(i) !== '>' && i < rawHTML.length) {
+                  tag += rawHTML.charAt(i); i++;
+                }
+                tag += '>';
+                currentHTML += tag;
+              } else {
+                currentHTML += rawHTML.charAt(i);
+                if (i % 4 === 0) sfx.type(); // Bruit de frappe
+              }
+
+              // Effet ASSASSINER glitch (spécifique au DOC_03)
+              let displayHTML = currentHTML;
+              if (doc.id === "DOC_03" && Math.random() < 0.05 && displayHTML.includes("Formater")) {
+                displayHTML = displayHTML.replace("Formater", "<span class='text-glitch'>ASSASSINER</span>");
+              }
+
+              readerContent.innerHTML = displayHTML + '<span class="cursor"></span>';
+              i++;
+              readerContent.scrollTop = readerContent.scrollHeight; // Auto-scroll
+            } else {
+              clearInterval(typingTimer);
+              readerContent.innerHTML = currentHTML;
+            }
+          }, 15);
+        }
+
+        window.addEventListener('load', initList);
+
+      </script>
+</body>
+
+</html>

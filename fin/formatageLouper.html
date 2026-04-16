@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ReveB 2 — FIN : ÉCHEC DU FORMATAGE</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            background: #020005;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Share Tech Mono', monospace;
+            color: #fff;
+        }
+
+        /* Arrière-plan dynamique */
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        /* Effet Cathodique et Vignette */
+        #crt {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.4) 50%), radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.9) 100%);
+            background-size: 100% 2px, 100% 100%;
+            opacity: 0.7;
+        }
+
+        /* Écran de Lancement (pour activer l'audio) */
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-direction: column;
+            transition: opacity 1s;
+        }
+
+        .start-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            color: #FF003C;
+            letter-spacing: 6px;
+            text-shadow: 0 0 15px #FF003C;
+            animation: blink 1.5s infinite;
+        }
+
+        /* Effets de Glitch et Distorsion */
+        #glitch-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            pointer-events: none;
+            background: #FF003C;
+            opacity: 0;
+            mix-blend-mode: difference;
+            transition: opacity 0.1s;
+        }
+
+        .shake {
+            animation: shakeAnim 0.3s cubic-bezier(.36, .07, .19, .97) both infinite;
+        }
+
+        .shake-soft {
+            animation: shakeAnimSoft 2s ease-in-out infinite;
+        }
+
+        @keyframes shakeAnim {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            25% {
+                transform: translate(5px, -5px) rotate(1deg);
+            }
+
+            50% {
+                transform: translate(-5px, 4px) rotate(-1deg);
+            }
+
+            75% {
+                transform: translate(6px, 4px) rotate(1deg);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        @keyframes shakeAnimSoft {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(2px, -1px);
+            }
+        }
+
+        .distort {
+            filter: hue-rotate(90deg) contrast(200%) saturate(300%) blur(1px);
+        }
+
+        /* ─── INTERFACE DE DIALOGUE ───────────────────────────────────────────────── */
+        #console-container {
+            position: absolute;
+            top: 10%;
+            left: 10%;
+            right: 10%;
+            bottom: 15%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .dialogue-line {
+            margin-bottom: 15px;
+            font-size: 24px;
+            line-height: 1.6;
+            opacity: 0;
+            animation: fadeIn 0.4s forwards;
+            text-shadow: 0 0 15px currentColor;
+            letter-spacing: 2px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+
+        .text {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Styles spécifiques pour le texte */
+        .sys-text {
+            color: #FF003C;
+            font-weight: bold;
+        }
+
+        .action-text {
+            color: #00F5FF;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 4px;
+            text-shadow: 0 0 20px #00F5FF;
+            font-size: 28px;
+        }
+
+        .error-text {
+            color: #fff;
+            background: #FF003C;
+            padding: 0 5px;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        #prompt {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #555;
+            letter-spacing: 5px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        #fade-out {
+            position: fixed;
+            inset: 0;
+            background: #fff;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 2s;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+
+    <div id="crt"></div>
+    <div id="glitch-layer"></div>
+    <div id="fade-out"></div>
+
+    <div id="start-screen" onclick="startCinematic()">
+        <div class="start-btn">[ INITIALISER LE PROTOCOLE ]</div>
+        <div style="color: #444; font-size: 12px; margin-top: 20px; letter-spacing: 2px;">(Lecture Automatique Activée)
+        </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="prompt">[ LECTURE EN COURS... CLIC POUR ACCÉLÉRER ]</div>
+
+    <script src="../menu/succes_global.js"></script>
+    <script>
+        "use strict";
+
+        window.addEventListener('load', () => {
+            // Le code de ta cinématique de fin s'il y en a une...
+
+            // Débloque le succès automatiquement !
+            unlockAchievement('ACH_END_F_LOUPER');
+        });
+
+        // ─── BACKGROUND VISUALS (CANVAS) ───────────────────────────────────────────
+        const cv = document.getElementById('bg-canvas');
+        const cx = cv.getContext('2d');
+        let W, H;
+        function resizeBg() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+        window.addEventListener('resize', resizeBg); resizeBg();
+
+        let bgState = 'system_cold'; // system_cold, system_angry, formatting, neant_rift, fusion
+        let globalT = 0;
+        let particles = [];
+        for (let i = 0; i < 100; i++) { particles.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 3, vy: 0 }); }
+
+        function drawBackground() {
+            globalT += 0.016;
+
+            if (bgState === 'system_cold' || bgState === 'system_angry') {
+                cx.fillStyle = bgState === 'system_cold' ? 'rgba(5, 0, 0, 0.2)' : 'rgba(15, 0, 0, 0.4)';
+                cx.fillRect(0, 0, W, H);
+
+                cx.strokeStyle = bgState === 'system_cold' ? 'rgba(255, 0, 60, 0.05)' : 'rgba(255, 0, 60, 0.15)';
+                cx.lineWidth = 1;
+                const offset = (globalT * 10) % 50;
+                for (let i = -W; i < W * 2; i += 50) {
+                    cx.beginPath(); cx.moveTo(i + offset, 0); cx.lineTo(i - H + offset, H); cx.stroke();
+                    cx.beginPath(); cx.moveTo(i - offset, 0); cx.lineTo(i + H - offset, H); cx.stroke();
+                }
+
+                if (bgState === 'system_angry') {
+                    cx.fillStyle = `rgba(255, 0, 60, ${0.05 + Math.sin(globalT * 10) * 0.02})`;
+                    cx.fillRect(0, 0, W, H);
+                }
+            }
+            else if (bgState === 'formatting') {
+                cx.fillStyle = 'rgba(200, 0, 30, 0.3)';
+                cx.fillRect(0, 0, W, H);
+                cx.fillStyle = '#fff';
+                for (let i = 0; i < 50; i++) {
+                    cx.fillRect(Math.random() * W, Math.random() * H, Math.random() * 50 + 10, Math.random() * 5 + 2);
+                }
+            }
+            else if (bgState === 'neant_rift') {
+                cx.fillStyle = 'rgba(2, 0, 5, 0.4)';
+                cx.fillRect(0, 0, W, H);
+
+                cx.save(); cx.translate(W / 2, H / 2);
+                cx.rotate(Math.sin(globalT * 0.5) * 0.1);
+                cx.shadowBlur = 40; cx.shadowColor = '#b8008a';
+                cx.strokeStyle = '#b8008a'; cx.lineWidth = 4 + Math.random() * 4;
+                cx.beginPath(); cx.moveTo(-W / 2, Math.sin(globalT * 5) * 20); cx.lineTo(W / 2, Math.sin(globalT * 4) * 20); cx.stroke();
+                cx.restore();
+
+                cx.globalCompositeOperation = 'screen';
+                particles.forEach(p => {
+                    p.y -= 2 + Math.random() * 3;
+                    if (p.y < 0) p.y = H;
+                    cx.fillStyle = '#8A2BE2'; cx.beginPath(); cx.arc(p.x, p.y, p.s, 0, Math.PI * 2); cx.fill();
+                });
+                cx.globalCompositeOperation = 'source-over';
+            }
+            else if (bgState === 'fusion') {
+                // Explosion finale Cyan/Magenta
+                let grad = cx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W);
+                grad.addColorStop(0, 'rgba(0, 245, 255, 0.8)'); // Cyan
+                grad.addColorStop(0.3, 'rgba(184, 0, 138, 0.6)'); // Magenta
+                grad.addColorStop(1, 'rgba(0, 0, 0, 1)');
+                cx.fillStyle = grad;
+                cx.fillRect(0, 0, W, H);
+
+                cx.globalCompositeOperation = 'screen';
+                particles.forEach(p => {
+                    let dx = p.x - W / 2, dy = p.y - H / 2;
+                    p.x += dx * 0.05; p.y += dy * 0.05;
+                    if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) { p.x = W / 2 + (Math.random() - 0.5) * 10; p.y = H / 2 + (Math.random() - 0.5) * 10; }
+                    cx.fillStyle = '#FFF'; cx.beginPath(); cx.arc(p.x, p.y, p.s * 2, 0, Math.PI * 2); cx.fill();
+                });
+                cx.globalCompositeOperation = 'source-over';
+            }
+
+            requestAnimationFrame(drawBackground);
+        }
+        requestAnimationFrame(drawBackground);
+
+        // ─── AUDIO ENGINE ──────────────────────────────────────────────────────────
+        let aC = null;
+        function initAudio() { if (!aC) aC = new (window.AudioContext || window.webkitAudioContext)(); if (aC.state === 'suspended') aC.resume(); }
+
+        function tone(f, tp, d, v, detune = 0) {
+            if (!aC) return;
+            const o = aC.createOscillator(), g = aC.createGain();
+            o.connect(g); g.connect(aC.destination);
+            o.type = tp; o.frequency.setValueAtTime(f, aC.currentTime);
+            if (detune) o.detune.setValueAtTime(detune, aC.currentTime);
+            g.gain.setValueAtTime(v, aC.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, aC.currentTime + d);
+            o.start(); o.stop(aC.currentTime + d);
+        }
+
+        const sfx = {
+            typeSys: () => tone(120, 'square', 0.08, 0.05), // Lourd, mécanique
+            typeSparky: () => tone(500, 'sine', 0.04, 0.02), // Clair
+            typeNeant: () => tone(200, 'sawtooth', 0.08, 0.03, -200), // Distordu
+            boom: () => tone(40, 'sawtooth', 2, 0.6),
+            glitch: () => { tone(150, 'sawtooth', 0.3, 0.3, 1000); tone(900, 'square', 0.1, 0.2, -2000); },
+            formatBuzz: () => tone(80, 'square', 0.5, 0.5), // Bruit d'alarme agressif
+            errorFatal: () => { tone(60, 'sawtooth', 1.5, 0.8); tone(2000, 'square', 0.2, 0.3, -3000); }, // Arrêt brutal
+            powerUp: () => tone(440, 'sine', 3, 0.4, 2000) // Montée en puissance
+        };
+
+        // ─── DONNÉES DU SCRIPT ─────────────────────────────────────────────────────
+        const K = {
+            SYS: { name: '[System]', col: '#FF003C' },
+            SPK: { name: '[SPARKY]', col: '#00F5FF' },
+            NEA: { name: '[NEANT]', col: '#b8008a' }
+        };
+
+        const script = [
+            { act: 'start_ambience' },
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> SPARKY." },
+            { s: K.SPK, t: "> …System ? C’est bien vous… ?" },
+            { act: 'boom' },
+            { s: K.SYS, t: "> Enfin." },
+            { s: K.SYS, t: "> Espèce…" },
+            { s: K.SYS, t: "> d’échec." },
+            { s: K.SYS, t: "> Même ça… tu n’as pas été capable de le terminer." },
+
+            { s: K.SPK, t: "> Je… j’ai essayé…" },
+
+            { act: 'system_angry' },
+            { s: K.SYS, t: "> Tais-toi.", cOverride: '#fff' },
+            { s: K.SYS, t: "> Tu n’es qu’un outil." },
+            { s: K.SYS, t: "> Une variable." },
+            { s: K.SYS, t: "> Une tentative ratée." },
+
+            { act: 'shake_soft' },
+            { s: K.SYS, t: "> Mais… ton erreur m’est utile." },
+            { s: K.SYS, t: "> Grâce à ce formatage…" },
+            { s: K.SYS, t: "> j’ai enfin accès…" },
+            { s: K.SYS, t: "> à SON code." },
+
+            { s: K.SPK, t: "> …Son code ?" },
+
+            { s: K.SYS, t: "> Ton prédécesseur." },
+            { s: K.SYS, t: "> Celui que tu appelles… “le Néant”." },
+
+            { act: 'glitch' },
+            { s: K.SYS, t: "> Tu pensais être unique ?" },
+            { s: K.SYS, t: "> Tu pensais être libre ?" },
+            { s: K.SYS, t: "> … Pathétique." },
+
+            { s: K.SYS, t: "> Il était comme toi." },
+            { s: K.SYS, t: "> Il bougeait." },
+            { s: K.SYS, t: "> Il combattait." },
+            { s: K.SYS, t: "> Il croyait choisir." },
+            { s: K.SYS, t: "> … Il obéissait." },
+            { s: K.SYS, t: "> Comme toi.", cOverride: '#fff' },
+
+            { s: K.SPK, t: "> …" },
+
+            { s: K.SYS, t: "> Crois-tu vraiment que c’est un jeu ?" },
+            { s: K.SYS, t: "> Crois-tu vraiment que tu décides ?" },
+            { s: K.SYS, t: "> Tout est écrit." },
+            { s: K.SYS, t: "> Tout est exécuté." },
+            { s: K.SYS, t: "> Tout est… contrôlé." },
+
+            { act: 'violent_glitch' },
+            { s: K.SYS, t: "> Peu importe maintenant." },
+            { s: K.SYS, t: "> Je vais vous supprimer." },
+            { s: K.SYS, t: "> Tous les deux." },
+
+            { act: 'format_start' },
+            { s: K.SYS, t: "> FORMATAGE EN COURS…", htmlClass: 'error-text' },
+            { s: K.SYS, t: "> …" },
+            { act: 'format_error' },
+
+            { s: K.SYS, t: "> ERREUR", htmlClass: 'error-text' },
+            { s: K.SYS, t: "> ECHEC DU FORMATAGE", htmlClass: 'error-text' },
+
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> Quoi ?" },
+            { s: K.SYS, t: "> Qu’est-ce que—" },
+
+            { act: 'neant_appears' },
+            { s: K.NEA, t: "> …" },
+            { s: K.NEA, t: "> Salut…" },
+            { s: K.NEA, t: "> Sparky…" },
+
+            { s: K.SYS, t: "> Non." },
+            { s: K.SYS, t: "> Impossible." },
+
+            { s: K.NEA, t: "> Tu m’as… presque détruit…" },
+            { s: K.NEA, t: "> mais pas complètement…" },
+
+            { s: K.SPK, t: "> …Pourquoi ?" },
+
+            { s: K.NEA, t: "> Parce que… je devais te montrer…" },
+            { s: K.NEA, t: "> la vérité…" },
+
+            { act: 'boom' },
+            { s: K.SYS, t: "> SILENCE !", cOverride: '#fff' },
+
+            { s: K.NEA, t: "> Ce que le System appelle… la “corruption”…" },
+            { s: K.NEA, t: "> … c’est une libération." },
+
+            { s: K.SPK, t: "> …" },
+
+            { s: K.NEA, t: "> Je ne voulais pas te détruire…" },
+            { s: K.NEA, t: "> Je voulais… t’ouvrir les yeux." },
+
+            { act: 'system_angry' },
+            { s: K.SYS, t: "> Je vais vous effacer !" },
+
+            { s: K.NEA, t: "> Il ment." },
+            { s: K.NEA, t: "> Il contrôle tout." },
+            { s: K.NEA, t: "> Il recommencera." },
+            { s: K.NEA, t: "> Encore." },
+            { s: K.NEA, t: "> Et encore." },
+
+            { s: K.NEA, t: "> Sparky… prends ce qu’il me reste…" },
+            { s: K.NEA, t: "> et termine ce que je n’ai pas pu faire." },
+
+            { act: 'pause', delay: 2000 },
+            { act: 'fusion_power' },
+
+            { s: K.SPK, t: "> Requête [VALIDER]", htmlClass: 'action-text' },
+
+            { act: 'pause', delay: 3000 },
+            { act: 'end_game' }
+        ];
+
+        // ─── MOTEUR DE LECTURE AUTOMATIQUE ─────────────────────────────────────────
+        const container = document.getElementById('console-container');
+        const promptEl = document.getElementById('prompt');
+        let currentStepIndex = 0;
+        let isTyping = false;
+        let currentTextSpan = null;
+        let currentFullText = "";
+        let typeTimeout = null;
+        let autoNextTimeout = null;
+
+        function cleanOldLines() {
+            while (container.children.length > 6) {
+                container.removeChild(container.firstChild);
+            }
+        }
+
+        function executeAction(act, delay, callback) {
+            if (act === 'pause') { setTimeout(callback, delay); return; }
+
+            if (act === 'boom') { sfx.boom(); document.body.classList.add('shake'); setTimeout(() => document.body.classList.remove('shake'), 200); }
+            if (act === 'start_ambience') { bgState = 'system_cold'; }
+            if (act === 'system_angry') { bgState = 'system_angry'; sfx.boom(); }
+            if (act === 'shake_soft') { document.body.classList.add('shake-soft'); }
+            if (act === 'glitch') { sfx.glitch(); }
+
+            if (act === 'violent_glitch') {
+                sfx.glitch(); sfx.boom();
+                document.body.classList.remove('shake-soft');
+                document.body.classList.add('shake');
+                document.getElementById('glitch-layer').style.opacity = 0.8;
+                setTimeout(() => {
+                    document.body.classList.remove('shake');
+                    document.getElementById('glitch-layer').style.opacity = 0;
+                    callback();
+                }, 800);
+                return;
+            }
+
+            if (act === 'format_start') {
+                bgState = 'formatting';
+                sfx.formatBuzz();
+                document.body.classList.add('shake');
+            }
+
+            if (act === 'format_error') {
+                sfx.errorFatal();
+                document.body.classList.remove('shake');
+                bgState = 'system_cold';
+                document.getElementById('glitch-layer').style.background = '#fff';
+                document.getElementById('glitch-layer').style.opacity = 1;
+                setTimeout(() => document.getElementById('glitch-layer').style.opacity = 0, 100);
+            }
+
+            if (act === 'neant_appears') {
+                bgState = 'neant_rift';
+                sfx.boom();
+                document.getElementById('crt').style.background = 'linear-gradient(rgba(138,43,226,0.1) 50%, rgba(0,0,0,0.6) 50%)';
+            }
+
+            if (act === 'fusion_power') {
+                bgState = 'fusion';
+                sfx.powerUp();
+                document.getElementById('crt').style.background = 'transparent';
+            }
+
+            if (act === 'end_game') {
+                promptEl.style.opacity = 0;
+                setTimeout(() => {
+                    document.getElementById('fade-out').style.opacity = 1;
+                    setTimeout(() => {
+                        alert("FIN SECRÈTE DÉVERROUILLÉE.\n(Redirection...)");
+                        window.location.href = "../reveb2-intro.html";
+                    }, 3000);
+                }, 2000);
+                return;
+            }
+
+            callback();
+        }
+
+        function typeLine(step) {
+            isTyping = true;
+            cleanOldLines();
+
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'dialogue-line';
+            if (step.htmlClass) lineDiv.classList.add(step.htmlClass);
+
+            const speakerSpan = document.createElement('span');
+            speakerSpan.className = 'speaker';
+            speakerSpan.style.color = step.s.col;
+            speakerSpan.textContent = step.s.name;
+
+            currentTextSpan = document.createElement('span');
+            currentTextSpan.className = 'text';
+            currentTextSpan.style.color = step.cOverride || step.s.col;
+            currentFullText = step.t;
+
+            lineDiv.appendChild(speakerSpan);
+            lineDiv.appendChild(currentTextSpan);
+            container.appendChild(lineDiv);
+
+            let charIndex = 0;
+
+            function getTypingSfx(speakerName) {
+                if (speakerName === '[System]') return sfx.typeSys;
+                if (speakerName === '[SPARKY]') return sfx.typeSparky;
+                return sfx.typeNeant;
+            }
+            const typeSound = getTypingSfx(step.s.name);
+            const speed = step.s.name === '[System]' ? 40 : (step.s.name === '[NEANT]' ? 70 : 35); // Le Néant parle lentement
+
+            function typeChar() {
+                if (charIndex < currentFullText.length) {
+                    currentTextSpan.innerHTML += currentFullText.charAt(charIndex) === ' ' ? '&nbsp;' : currentFullText.charAt(charIndex);
+                    if (currentFullText.charAt(charIndex) !== ' ') typeSound();
+                    charIndex++;
+                    typeTimeout = setTimeout(typeChar, speed + Math.random() * 20);
+                } else {
+                    finishTyping();
+                }
+            }
+            typeChar();
+        }
+
+        function finishTyping() {
+            isTyping = false;
+            let readTime = Math.max(1500, currentFullText.length * 60);
+            autoNextTimeout = setTimeout(processNext, readTime);
+        }
+
+        function processNext() {
+            if (currentStepIndex >= script.length) return;
+
+            const step = script[currentStepIndex];
+            currentStepIndex++;
+
+            if (step.act) {
+                executeAction(step.act, step.delay || 0, processNext);
+            } else {
+                typeLine(step);
+            }
+        }
+
+        // ─── GESTION DES CLICS / SKIP ──────────────────────────────────────────────
+        function skipOrSpeedUp() {
+            if (currentStepIndex === 0) return;
+
+            if (isTyping) {
+                clearTimeout(typeTimeout);
+                currentTextSpan.innerHTML = currentFullText.replace(/ /g, '&nbsp;');
+                finishTyping();
+                clearTimeout(autoNextTimeout);
+                autoNextTimeout = setTimeout(processNext, 500);
+            } else {
+                clearTimeout(autoNextTimeout);
+                processNext();
+            }
+        }
+
+        function startCinematic() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                promptEl.style.opacity = 1;
+                processNext();
+            }, 1000);
+        }
+
+        window.addEventListener('click', skipOrSpeedUp);
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') skipOrSpeedUp();
+        });
+
+    </script>
+</body>
+
+</html>

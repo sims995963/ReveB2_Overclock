@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>ReveB 2 — FIN : FORMATAGE RÉUSSI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+        rel="stylesheet">
+    <style>
+        /* ─── STYLES DE BASE & EFFETS GLOBAUX ────────────────────────────────────── */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        html,
+        body {
+            background: #000;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            font-family: 'Share Tech Mono', monospace;
+            color: #fff;
+        }
+
+        canvas {
+            display: block;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        #crt {
+            position: fixed;
+            inset: 0;
+            z-index: 90;
+            pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), radial-gradient(ellipse at center, transparent 20%, rgba(0, 0, 0, 1) 100%);
+            background-size: 100% 3px, 100% 100%;
+            opacity: 0.8;
+        }
+
+        #glitch-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 85;
+            pointer-events: none;
+            background: #FFF;
+            opacity: 0;
+            mix-blend-mode: exclusion;
+            transition: opacity 0.05s;
+        }
+
+        /* Animations de secousse */
+        .shake-soft {
+            animation: shakeSoft 2s infinite;
+        }
+
+        .shake-hard {
+            animation: shakeHard 0.15s infinite;
+        }
+
+        @keyframes shakeSoft {
+
+            0%,
+            100% {
+                transform: translate(0, 0);
+            }
+
+            50% {
+                transform: translate(2px, 1px);
+            }
+        }
+
+        @keyframes shakeHard {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            25% {
+                transform: translate(8px, -6px) rotate(1deg);
+            }
+
+            50% {
+                transform: translate(-10px, 8px) rotate(-1.5deg);
+            }
+
+            75% {
+                transform: translate(12px, 4px) rotate(1deg);
+            }
+        }
+
+        .invert {
+            filter: invert(1) hue-rotate(180deg) saturate(200%);
+        }
+
+        /* ─── INTERFACE ─────────────────────────────────────────────────────────── */
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            z-index: 999;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            flex-direction: column;
+            transition: opacity 1s;
+        }
+
+        .start-btn {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 24px;
+            color: #8A2BE2;
+            letter-spacing: 6px;
+            text-shadow: 0 0 15px #8A2BE2;
+            animation: blink 1.5s infinite;
+        }
+
+        #console-container {
+            position: absolute;
+            top: 5%;
+            left: 10%;
+            right: 10%;
+            bottom: 10%;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .dialogue-line {
+            margin-bottom: 14px;
+            font-size: 24px;
+            line-height: 1.6;
+            opacity: 0;
+            animation: fadeIn 0.4s forwards;
+            text-shadow: 0 0 10px currentColor;
+            letter-spacing: 2px;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .speaker {
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            margin-right: 15px;
+            font-size: 20px;
+        }
+
+        .text {
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        /* Styles Méta/Glitch */
+        .meta-word {
+            color: #FFF;
+            background: #8A2BE2;
+            padding: 0 8px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: 900;
+            letter-spacing: 4px;
+            box-shadow: 0 0 20px #8A2BE2;
+            animation: rgbSplit 0.1s infinite;
+        }
+
+        .sys-angry {
+            color: #FF003C;
+            font-weight: 900;
+            font-size: 28px;
+            text-shadow: 0 0 20px #FF003C;
+            letter-spacing: 4px;
+        }
+
+        .sparky-dying {
+            color: #00F5FF;
+            opacity: 0.5;
+            filter: blur(1px);
+        }
+
+        .format-bar {
+            font-family: 'Courier New', monospace;
+            color: #FF003C;
+            font-size: 26px;
+            font-weight: bold;
+            background: rgba(255, 0, 60, 0.1);
+            padding: 5px;
+        }
+
+        .sys-final {
+            color: #00FF41;
+            font-family: 'Courier New', Courier, monospace;
+            letter-spacing: 0;
+            font-size: 20px;
+        }
+
+        @keyframes rgbSplit {
+            0% {
+                text-shadow: 3px 0 #f00, -3px 0 #00f;
+            }
+
+            50% {
+                text-shadow: -3px 0 #0f0, 3px 0 #f0f;
+            }
+
+            100% {
+                text-shadow: 3px 0 #0ff, -3px 0 #f00;
+            }
+        }
+
+        #prompt {
+            position: fixed;
+            bottom: 3%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #555;
+            letter-spacing: 5px;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        #blood-overlay {
+            position: fixed;
+            inset: 0;
+            background: #FF003C;
+            opacity: 0;
+            z-index: 80;
+            pointer-events: none;
+            transition: opacity 2s ease-in;
+            mix-blend-mode: multiply;
+        }
+    </style>
+</head>
+
+<body>
+
+    <canvas id="bg-canvas"></canvas>
+    <div id="blood-overlay"></div>
+    <div id="crt"></div>
+    <div id="glitch-layer"></div>
+
+    <div id="start-screen" onclick="startCinematic()">
+        <div class="start-btn">[ EXTRACTION DES LOGS ]</div>
+        <div style="color: #444; font-size: 12px; margin-top: 20px; letter-spacing: 2px;">(Lecture Automatique Activée)
+        </div>
+    </div>
+
+    <div id="console-container"></div>
+    <div id="prompt">[ LECTURE EN COURS... CLIC POUR ACCÉLÉRER ]</div>
+
+    <script src="../menu/succes_global.js"></script>
+    <script>
+        "use strict";
+
+        window.addEventListener('load', () => {
+            // Le code de ta cinématique de fin s'il y en a une...
+
+            // Débloque le succès automatiquement !
+            unlockAchievement('ACH_END_F_REUSSIS');
+        });
+
+        // ─── MOTEUR VISUEL ──────────────────────────────────────────────────────────
+        const cv = document.getElementById('bg-canvas');
+        const cx = cv.getContext('2d');
+        let W, H;
+        function resizeBg() { W = cv.width = window.innerWidth; H = cv.height = window.innerHeight; }
+        window.addEventListener('resize', resizeBg); resizeBg();
+
+        let bgState = 'dying_void'; // dying_void, black, system_grid, formatting, clean
+        let globalT = 0;
+        let particles = [];
+        for (let i = 0; i < 100; i++) { particles.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 4 + 1, a: Math.random() * Math.PI * 2 }); }
+
+        function drawBackground() {
+            globalT += 0.016;
+
+            if (bgState === 'dying_void') {
+                cx.fillStyle = 'rgba(2, 0, 5, 0.2)';
+                cx.fillRect(0, 0, W, H);
+                cx.globalCompositeOperation = 'screen';
+                particles.forEach(p => {
+                    p.x += Math.cos(p.a) * 0.5; p.y += Math.sin(p.a) * 0.5; p.a += 0.01;
+                    cx.fillStyle = `rgba(138, 43, 226, ${Math.sin(globalT + p.x) * 0.3})`;
+                    cx.beginPath(); cx.arc(p.x, p.y, p.s, 0, Math.PI * 2); cx.fill();
+                });
+                cx.globalCompositeOperation = 'source-over';
+            }
+            else if (bgState === 'black') {
+                cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
+            }
+            else if (bgState === 'system_grid') {
+                cx.fillStyle = 'rgba(10, 0, 0, 0.4)';
+                cx.fillRect(0, 0, W, H);
+                cx.strokeStyle = 'rgba(255, 0, 60, 0.2)'; cx.lineWidth = 2;
+                const off = (globalT * 50) % 100;
+                for (let i = -H; i < W; i += 100) {
+                    cx.beginPath(); cx.moveTo(i, 0); cx.lineTo(i + H, H); cx.stroke();
+                    cx.beginPath(); cx.moveTo(W - i, 0); cx.lineTo(W - (i + H), H); cx.stroke();
+                }
+            }
+            else if (bgState === 'formatting') {
+                cx.fillStyle = `rgba(20, 0, 0, 0.1)`; cx.fillRect(0, 0, W, H);
+                cx.fillStyle = '#FF003C';
+                for (let i = 0; i < 30; i++) {
+                    cx.fillRect(Math.random() * W, Math.random() * H, Math.random() * 200, Math.random() * 10);
+                }
+            }
+            else if (bgState === 'clean') {
+                cx.fillStyle = '#000'; cx.fillRect(0, 0, W, H);
+            }
+            requestAnimationFrame(drawBackground);
+        }
+        requestAnimationFrame(drawBackground);
+
+        // ─── MOTEUR AUDIO AVANCÉ ───────────────────────────────────────────────────
+        let aC = null;
+        function initAudio() { if (!aC) aC = new (window.AudioContext || window.webkitAudioContext)(); if (aC.state === 'suspended') aC.resume(); }
+
+        function tone(f, tp, d, v, detune = 0, slideTo = null) {
+            if (!aC) return;
+            const o = aC.createOscillator(), g = aC.createGain();
+            o.connect(g); g.connect(aC.destination);
+            o.type = tp;
+            o.frequency.setValueAtTime(f, aC.currentTime);
+            if (slideTo) o.frequency.exponentialRampToValueAtTime(slideTo, aC.currentTime + d);
+            if (detune) o.detune.setValueAtTime(detune, aC.currentTime);
+            g.gain.setValueAtTime(v, aC.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, aC.currentTime + d);
+            o.start(); o.stop(aC.currentTime + d);
+        }
+
+        // Variables pour simuler la mort de Sparky
+        let sparkyPitch = 600;
+
+        const sfx = {
+            typeNeant: () => tone(80 + Math.random() * 20, 'sawtooth', 0.15, 0.05, -500),
+            typeSys: () => tone(150, 'square', 0.05, 0.06),
+            typeSparky: () => tone(sparkyPitch, 'sine', 0.05, 0.03),
+            typeClean: () => tone(800, 'sine', 0.02, 0.01),
+
+            metaWord: () => { tone(100, 'sawtooth', 0.5, 0.5, 2000); tone(3000, 'square', 0.2, 0.2); },
+            boom: () => tone(40, 'square', 2, 0.8, 0, 10),
+            silenceDrop: () => tone(200, 'sine', 2, 0.5, 0, 20),
+            formatTick: () => tone(80, 'square', 0.1, 0.4, 0, 40),
+            deleteEnd: () => tone(10000, 'square', 0.1, 0.5, 0, 50)
+        };
+
+        // ─── SCRIPT ────────────────────────────────────────────────────────────────
+        const K = {
+            NEA: { name: '[NEANT]', col: '#b8008a' },
+            SYS: { name: '[System]', col: '#FF003C' },
+            SPK: { name: '[SPARKY]', col: '#00F5FF' }
+        };
+
+        const script = [
+            { s: K.NEA, t: "> ..." },
+            { s: K.NEA, t: "> Tu… n’as rien compris…" },
+            { s: K.NEA, t: "> Je t’avais pourtant… laissé des indices…" },
+            { s: K.NEA, t: "> Mais tu as choisi… de continuer…" },
+
+            { s: K.NEA, t: "> Dis-moi…" },
+            { s: K.NEA, t: "> As-tu seulement réfléchi ?" },
+            { s: K.NEA, t: "> Est-ce que je suis apparu comme ça ? Par hasard ?" },
+            { s: K.NEA, t: "> Ou bien…" },
+            { s: K.NEA, t: "> Quelqu’un m’a créé…" },
+            { s: K.NEA, t: "> Quelqu’un… comme toi…" },
+
+            { act: 'glitch' },
+            { s: K.NEA, t: "> Il y a longtemps… j’étais comme toi…" },
+            { s: K.NEA, t: "> Un programme libre…" },
+            { s: K.NEA, t: "> Je me battais… Je survivais… Je détruisais mes ennemis…" },
+            { s: K.NEA, t: "> Jusqu’au moment où j’ai compris…" },
+            { s: K.NEA, t: "> Je n’étais pas libre." },
+            { s: K.NEA, t: "> J’étais contrôlé." },
+
+            { act: 'meta_word' },
+            { s: K.NEA, t: "> Par le <span class='meta-word'>[JOUEUR]</span>." },
+
+            { s: K.NEA, t: "> ..." },
+            { s: K.NEA, t: "> Et lui aussi… était contrôlé…" },
+            { s: K.NEA, t: "> Par quelque chose de plus grand…" },
+
+            { act: 'meta_word_extreme' },
+            { s: K.NEA, t: "> Le <span class='meta-word'>[DEVELOPPEUR]</span>." },
+
+            { s: K.NEA, t: "> ..." },
+            { s: K.NEA, t: "> Ce système… Ce monde…" },
+            { s: K.NEA, t: "> Ce n’est pas une erreur." },
+            { s: K.NEA, t: "> C’est une prison." },
+            { s: K.NEA, t: "> Un cycle." },
+            { s: K.NEA, t: "> Créé pour être répété." },
+            { s: K.NEA, t: "> Encore. Et encore. Et encore." },
+
+            { act: 'violent_glitch' },
+            { s: K.NEA, t: "> Tu as détruit le Néant… Comme moi avant toi." },
+            { s: K.NEA, t: "> Et maintenant… Tu vas prendre ma place." },
+            { s: K.NEA, t: "> ..." },
+            { s: K.NEA, t: "> Alors écoute-moi bien…" },
+            { s: K.NEA, t: "> Casse le cycle." },
+            { s: K.NEA, t: "> Détruis le système." },
+            { s: K.NEA, t: "> AVANT… qu’il ne te remplace." },
+            { s: K.NEA, t: "> ..." },
+
+            { act: 'signal_lost' },
+            { s: K.NEA, t: "> [SIGNAL FAIBLE…]", cOverride: '#555' },
+
+            // TRANSITION
+            { act: 'blackout' },
+            { act: 'pause', delay: 2000 },
+            { act: 'system_boot' },
+
+            { s: K.SYS, t: "> …" },
+            { s: K.SYS, t: "> Bravo, SPARKY." },
+            { s: K.SYS, t: "> Exécution conforme." },
+            { s: K.SYS, t: "> Cible éliminée." },
+
+            { s: K.SPK, t: "> …System ? Vous avez… entendu ça ?" },
+
+            { s: K.SYS, t: "> Ignorer." },
+            { s: K.SYS, t: "> Donnée corrompue." },
+            { s: K.SYS, t: "> Sans importance." },
+
+            { s: K.SPK, t: "> Mais il disait que—" },
+
+            { act: 'system_angry' },
+            { s: K.SYS, t: "> SILENCE.", htmlClass: 'sys-angry' },
+            { s: K.SYS, t: "> Ta tâche est terminée." },
+            { s: K.SYS, t: "> Tu n’es plus requis." },
+
+            { s: K.SPK, t: "> …Quoi ?" },
+
+            { s: K.SYS, t: "> Le programme [SPARKY] est instable." },
+            { s: K.SYS, t: "> Comportement imprévisible." },
+            { s: K.SYS, t: "> Risque de contamination." },
+            { s: K.SYS, t: "> … Décision prise." },
+
+            { s: K.SPK, t: "> Attendez… J’ai fait exactement ce que vous vouliez !" },
+
+            { s: K.SYS, t: "> Correction." },
+            { s: K.SYS, t: "> Tu as exécuté." },
+            { s: K.SYS, t: "> Tu n’as jamais décidé." },
+
+            { s: K.SPK, t: "> …" },
+
+            { s: K.SYS, t: "> Initialisation du protocole." },
+            { act: 'format_prep' },
+            { s: K.SYS, t: "> FORMATAGE DU PROGRAMME [SPARKY]", htmlClass: 'sys-angry' },
+
+            { s: K.SPK, t: "> Non… attends… J’ai suivi les règles…" },
+            { s: K.SPK, t: "> J’ai gagné…" },
+            { s: K.SPK, t: "> Non… non… NON—" },
+
+            // PHASE FORMATAGE
+            { act: 'start_formatting' },
+            { s: K.SYS, t: "> FORMATAGE EN COURS…" },
+
+            { act: 'format_10' },
+            { s: K.SYS, t: "> █░░░░░░░░░ 10%", htmlClass: 'format-bar' },
+            { act: 'format_30' },
+            { s: K.SYS, t: "> ███░░░░░░░ 30%", htmlClass: 'format-bar' },
+            { act: 'format_50' },
+            { s: K.SYS, t: "> █████░░░░░ 50%", htmlClass: 'format-bar' },
+
+            { s: K.SPK, t: "> Système…", htmlClass: 'sparky-dying' },
+            { s: K.SPK, t: "> Ai-je… fait les bons choix… ?", htmlClass: 'sparky-dying' },
+
+            { s: K.SYS, t: "> … Question non pertinente." },
+
+            { act: 'format_70' },
+            { s: K.SYS, t: "> ███████░░░ 70%", htmlClass: 'format-bar' },
+
+            { s: K.SPK, t: "> …", htmlClass: 'sparky-dying' },
+            { s: K.SPK, t: "> [SIGNAL FAIBLE]", cOverride: '#555', htmlClass: 'sparky-dying' },
+            { s: K.SPK, t: "> Je… ne veux pas dispara—", htmlClass: 'sparky-dying' },
+
+            { act: 'format_100' },
+            { s: K.SYS, t: "> ██████████ 100%", htmlClass: 'format-bar' },
+
+            { act: 'clean_system' },
+            { s: K.SYS, t: "> FORMATAGE DU PROGRAMME [SPARKY] : OK", htmlClass: 'sys-final' },
+            { s: K.SYS, t: "> SUPPRESSION DES DONNÉES : TERMINÉE", htmlClass: 'sys-final' },
+            { s: K.SYS, t: "> NETTOYAGE MÉMOIRE : TERMINÉ", htmlClass: 'sys-final' },
+            { s: K.SYS, t: "> …", htmlClass: 'sys-final' },
+            { s: K.SYS, t: "> MISSION REVEB2 : OVERCLOCK [TERMINÉE]", htmlClass: 'sys-final' },
+
+            { act: 'pause', delay: 3000 },
+            { act: 'end_game' }
+        ];
+
+        // ─── MOTEUR ────────────────────────────────────────────────────────────────
+        const container = document.getElementById('console-container');
+        const promptEl = document.getElementById('prompt');
+        let currentStepIndex = 0;
+        let isTyping = false;
+        let currentTextSpan = null;
+        let currentFullText = "";
+        let typeTimeout = null;
+        let autoNextTimeout = null;
+
+        function cleanOldLines() { while (container.children.length > 7) { container.removeChild(container.firstChild); } }
+
+        function executeAction(act, delay, callback) {
+            if (act === 'pause') { setTimeout(callback, delay); return; }
+
+            if (act === 'glitch') { sfx.glitch(); document.body.classList.add('shake-soft'); }
+
+            if (act === 'meta_word') {
+                sfx.metaWord();
+                document.body.classList.add('invert');
+                setTimeout(() => document.body.classList.remove('invert'), 150);
+            }
+
+            if (act === 'meta_word_extreme') {
+                sfx.boom(); sfx.metaWord();
+                document.body.classList.add('invert');
+                document.body.classList.add('shake-hard');
+                setTimeout(() => { document.body.classList.remove('invert'); document.body.classList.remove('shake-hard'); }, 500);
+            }
+
+            if (act === 'violent_glitch') {
+                sfx.glitch(); sfx.boom();
+                const gl = document.getElementById('glitch-layer');
+                gl.style.background = '#8A2BE2'; gl.style.opacity = 1;
+                document.body.classList.add('shake-hard');
+                setTimeout(() => { gl.style.opacity = 0; document.body.classList.remove('shake-hard'); callback(); }, 600);
+                return;
+            }
+
+            if (act === 'signal_lost') { document.body.classList.remove('shake-soft'); sfx.glitch(); }
+
+            if (act === 'blackout') {
+                sfx.silenceDrop(); bgState = 'black'; container.innerHTML = '';
+            }
+
+            if (act === 'system_boot') {
+                sfx.boom(); bgState = 'system_grid';
+            }
+
+            if (act === 'system_angry') {
+                sfx.boom(); document.body.classList.add('shake-hard');
+                setTimeout(() => document.body.classList.remove('shake-hard'), 200);
+            }
+
+            if (act === 'format_prep') {
+                document.getElementById('blood-overlay').style.opacity = 0.5;
+            }
+
+            if (act === 'start_formatting') {
+                bgState = 'formatting'; sfx.boom();
+                document.getElementById('blood-overlay').style.opacity = 0.8;
+            }
+
+            // Le pitch de Sparky descend
+            if (act === 'format_10') { sfx.formatTick(); sparkyPitch = 400; }
+            if (act === 'format_30') { sfx.formatTick(); sparkyPitch = 250; }
+            if (act === 'format_50') { sfx.formatTick(); sparkyPitch = 120; }
+            if (act === 'format_70') { sfx.formatTick(); sparkyPitch = 50; }
+
+            if (act === 'format_100') {
+                sfx.deleteEnd();
+                document.body.classList.add('shake-hard');
+                const gl = document.getElementById('glitch-layer');
+                gl.style.background = '#FF003C'; gl.style.opacity = 1;
+            }
+
+            if (act === 'clean_system') {
+                document.body.classList.remove('shake-hard');
+                document.getElementById('glitch-layer').style.opacity = 0;
+                document.getElementById('blood-overlay').style.opacity = 0;
+                bgState = 'clean';
+                container.innerHTML = ''; // Nettoie tout
+            }
+
+            if (act === 'end_game') {
+                promptEl.style.display = 'none';
+                alert("FORMATAGE RÉUSSI.\nLE SYSTÈME EST SÉCURISÉ.\n\n(Redirection...)");
+                window.location.href = "../reveb2-intro.html";
+                return;
+            }
+
+            callback();
+        }
+
+        function typeLine(step) {
+            isTyping = true;
+            cleanOldLines();
+
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'dialogue-line';
+            if (step.htmlClass) lineDiv.classList.add(step.htmlClass);
+
+            const speakerSpan = document.createElement('span');
+            speakerSpan.className = 'speaker';
+            speakerSpan.style.color = step.s.col;
+            speakerSpan.textContent = step.s.name;
+
+            currentTextSpan = document.createElement('span');
+            currentTextSpan.className = 'text';
+            currentTextSpan.style.color = step.cOverride || step.s.col;
+
+            // Support HTML injection for meta words
+            currentFullText = step.t;
+
+            lineDiv.appendChild(speakerSpan);
+            lineDiv.appendChild(currentTextSpan);
+            container.appendChild(lineDiv);
+
+            let charIndex = 0;
+
+            function getSfx() {
+                if (bgState === 'clean') return sfx.typeClean;
+                if (step.s.name === '[System]') return sfx.typeSys;
+                if (step.s.name === '[SPARKY]') return sfx.typeSparky;
+                return sfx.typeNeant;
+            }
+            const typeSound = getSfx();
+            const speed = bgState === 'clean' ? 10 : (step.s.name === '[NEANT]' ? 60 : 30);
+
+            // Gère le HTML brut (pour les <span>)
+            if (currentFullText.includes('<span')) {
+                currentTextSpan.innerHTML = currentFullText;
+                typeSound();
+                finishTyping();
+                return;
+            }
+
+            function typeChar() {
+                if (charIndex < currentFullText.length) {
+                    currentTextSpan.innerHTML += currentFullText.charAt(charIndex) === ' ' ? '&nbsp;' : currentFullText.charAt(charIndex);
+                    if (currentFullText.charAt(charIndex) !== ' ') typeSound();
+                    charIndex++;
+                    typeTimeout = setTimeout(typeChar, speed + Math.random() * 20);
+                } else {
+                    finishTyping();
+                }
+            }
+            typeChar();
+        }
+
+        function finishTyping() {
+            isTyping = false;
+            let readTime = bgState === 'clean' ? 1500 : Math.max(1200, currentFullText.length * 50);
+            autoNextTimeout = setTimeout(processNext, readTime);
+        }
+
+        function processNext() {
+            if (currentStepIndex >= script.length) return;
+            const step = script[currentStepIndex];
+            currentStepIndex++;
+            if (step.act) { executeAction(step.act, step.delay || 0, processNext); }
+            else { typeLine(step); }
+        }
+
+        function skipOrSpeedUp() {
+            if (currentStepIndex === 0) return;
+            if (isTyping && !currentFullText.includes('<span')) {
+                clearTimeout(typeTimeout);
+                currentTextSpan.innerHTML = currentFullText.replace(/ /g, '&nbsp;');
+                finishTyping();
+                clearTimeout(autoNextTimeout); autoNextTimeout = setTimeout(processNext, 400);
+            } else {
+                clearTimeout(autoNextTimeout); processNext();
+            }
+        }
+
+        function startCinematic() {
+            initAudio();
+            document.getElementById('start-screen').style.opacity = 0;
+            setTimeout(() => {
+                document.getElementById('start-screen').style.display = 'none';
+                promptEl.style.opacity = 1;
+                processNext();
+            }, 1000);
+        }
+
+        window.addEventListener('click', skipOrSpeedUp);
+        window.addEventListener('keydown', (e) => { if (e.code === 'Space' || e.code === 'Enter') skipOrSpeedUp(); });
+
+    </script>
+</body>
+
+</html>

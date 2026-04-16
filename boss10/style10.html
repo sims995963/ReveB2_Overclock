@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Showcase PHANT0M</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Bangers&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#010002;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff; cursor:crosshair;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+/* Post-Processing : CRT et Vignette */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.5) 50%),linear-gradient(90deg,rgba(138,43,226,0.04),rgba(255,0,60,0.04),rgba(0,245,255,0.04));background-size:100% 2px, 3px 100%;opacity:0.9;}
+#vignette{position:fixed;inset:0;z-index:89;pointer-events:none;background:radial-gradient(circle at center, transparent 10%, #000 120%);}
+
+/* ─── UI CINÉMATIQUE ──────────────────────────────────────────────────────── */
+#ui-layer {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 100;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    background: rgba(10, 0, 15, 0.85); padding: 15px 30px;
+    border: 2px solid #8A2BE2; border-radius: 8px; box-shadow: 0 0 20px rgba(138,43,226,0.4);
+    backdrop-filter: blur(5px); transition: all 0.4s;
+}
+
+#boss-name { font-family: 'Orbitron', sans-serif; font-size: 32px; font-weight: 900; letter-spacing: 10px; color: #8A2BE2; text-shadow: 0 0 20px #8A2BE2; transition: all 0.4s;}
+#boss-desc { font-size: 14px; font-style: italic; color: #aaa; letter-spacing: 3px; margin-bottom: 10px; transition: color 0.4s;}
+
+.row { display: flex; gap: 15px; margin-top: 5px; }
+.btn {
+    padding: 10px 15px; border: 2px solid #555; background: transparent; color: #aaa;
+    cursor: pointer; font-size: 1rem; font-family: 'Orbitron', sans-serif; font-weight: bold;
+    transition: all 0.2s; letter-spacing: 1px;
+}
+.btn:hover { color: #fff; border-color: #fff; box-shadow: 0 0 10px rgba(255,255,255,0.5); }
+.btn.active { color: #8A2BE2; border-color: #8A2BE2; box-shadow: 0 0 15px rgba(138,43,226,0.6); background: rgba(138,43,226,0.1); }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="vignette"></div>
+
+<div id="ui-layer">
+    <div id="boss-name">PHANT0M</div>
+    <div id="boss-desc">PHASE 1 : LA SENTINELLE AVEUGLE</div>
+    <div class="row">
+        <button class="btn active" id="btn-1" onclick="setPhase(1)">PH1 (Sentinelle)</button>
+        <button class="btn" id="btn-2" onclick="setPhase(2)">PH2 (Furtif)</button>
+        <button class="btn" id="btn-3" onclick="setPhase(3)">PH3 (Extermination)</button>
+    </div>
+</div>
+
+<script>
+"use strict";
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MOTEUR DE RENDU
+// ═════════════════════════════════════════════════════════════════════════════
+const cv = document.getElementById('c'), cx = cv.getContext('2d', { alpha: false });
+let W, H, cX, cY;
+let mx = window.innerWidth / 2, my = window.innerHeight / 2;
+let currentPhase = 1;
+let globalT = 0, lastTime = 0;
+
+// Variables pour l'animation douce de l'œil
+let eyeTrackX = 0, eyeTrackY = 0;
+
+// Particules pour la Phase 2 (Nuage de pixels)
+let ghostParticles = [];
+for(let i=0; i<150; i++) {
+    ghostParticles.push({
+        x: (Math.random() - 0.5) * 200, y: (Math.random() - 0.5) * 200,
+        z: Math.random() * 2 + 0.5, // Profondeur pour la parallaxe interne
+        size: Math.random() * 6 + 2,
+        offset: Math.random() * Math.PI * 2
+    });
+}
+
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; cX = W/2; cY = H/2 - 30; }
+window.addEventListener('resize', resize); resize();
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+const glow = (color, blur) => { cx.shadowColor = color; cx.shadowBlur = blur; };
+const noGlow = () => { cx.shadowBlur = 0; };
+const clamp = (val, min, max) => Math.max(min, Math.min(max, val));
+
+const ALERT_WORDS = ['ÉLIMINER', 'MENACE', 'PURGE', 'CRITIQUE', 'FATAL', 'ERREUR'];
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  INTERFACE
+// ═════════════════════════════════════════════════════════════════════════════
+const phaseData = {
+    1: { col: '#8A2BE2', desc: "PHASE 1 : LA SENTINELLE AVEUGLE" },
+    2: { col: '#00F5FF', desc: "PHASE 2 : LE FANTÔME DE DONNÉES" },
+    3: { col: '#FF003C', desc: "PHASE 3 : PROTOCOLE D'EXTERMINATION" }
+};
+
+function setPhase(p) {
+    currentPhase = p;
+    document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${p}`).classList.add('active');
+
+    const data = phaseData[p];
+    document.getElementById('boss-name').style.color = data.col;
+    document.getElementById('boss-name').style.textShadow = `0 0 20px ${data.col}`;
+    document.getElementById('ui-layer').style.borderColor = data.col;
+    document.getElementById('ui-layer').style.boxShadow = `0 0 20px ${data.col}66`;
+    document.getElementById('boss-desc').textContent = data.desc;
+    document.getElementById('boss-desc').style.color = p === 1 ? '#8A2BE2' : (p === 2 ? '#00F5FF' : '#FF003C');
+
+    document.querySelectorAll('.btn').forEach(btn => {
+        if(btn.classList.contains('active')) {
+            btn.style.color = data.col; btn.style.borderColor = data.col;
+            btn.style.background = `rgba(${p===1?'138,43,226':(p===2?'0,245,255':'255,0,60')}, 0.1)`;
+            btn.style.boxShadow = `0 0 15px ${data.col}99`;
+        } else {
+            btn.style.color = '#aaa'; btn.style.borderColor = '#555'; btn.style.background = 'transparent'; btn.style.boxShadow = 'none';
+        }
+    });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  FOND (Salle des Serveurs / Data Vault)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawDataVault(t, phase) {
+    // Fond dynamique selon la phase
+    let centerCol = phase === 1 ? '#0a001a' : (phase === 2 ? '#001a1a' : '#1a0005');
+    const bgGrad = cx.createRadialGradient(cX, cY, 0, cX, cY, W);
+    bgGrad.addColorStop(0, centerCol);
+    bgGrad.addColorStop(1, '#000000');
+    cx.fillStyle = bgGrad; cx.fillRect(0, 0, W, H);
+
+    // Lignes verticales de serveurs (Parallaxe)
+    cx.lineWidth = 2;
+    const fxCol = phaseData[phase].col;
+    cx.strokeStyle = `rgba(${phase===1?'138,43,226':(phase===2?'0,245,255':'255,0,60')}, 0.05)`;
+    
+    for(let i = 0; i < W; i += 120) {
+        cx.beginPath(); cx.moveTo(i, 0); cx.lineTo(i, H); cx.stroke();
+        // Petites lumières de serveurs
+        for(let j = 0; j < H; j += 80) {
+            if(Math.random() < 0.02) {
+                glow(fxCol, 10); cx.fillStyle = fxCol;
+                cx.fillRect(i - 2, j + (t*50)%100, 4, 10);
+                noGlow();
+            }
+        }
+    }
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PHASE 1 : LA SENTINELLE (Blindage & Radar Sonique)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawPhase1(t) {
+    const col = '#8A2BE2';
+    const TSZ = 100; // Taille de base
+    cx.save();
+    cx.translate(cX, cY + Math.sin(t*2)*15); // Lévitation lourde
+    cx.scale(1.5, 1.5);
+
+    // 1. ORBES / DRONES DE SÉCURITÉ (Boucliers rotatifs)
+    for(let i=0; i<8; i++) {
+        const oa = (i/8)*Math.PI*2 + t*0.8;
+        const or = 130 + Math.sin(t*2 + i)*10;
+        const ox = Math.cos(oa)*or, oy = Math.sin(oa)*or;
+        
+        cx.save(); cx.translate(ox, oy); cx.rotate(oa + Math.PI/2);
+        glow(col, 10); cx.fillStyle = '#111'; cx.strokeStyle = col; cx.lineWidth = 2;
+        cx.beginPath(); cx.moveTo(-10, -15); cx.lineTo(10, -15); cx.lineTo(0, 15); cx.closePath(); cx.fill(); cx.stroke();
+        cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, -5, 3, 0, Math.PI*2); cx.fill();
+        cx.restore(); noGlow();
+    }
+
+    // 2. NOUVEAU : RADARS SONIQUES / ENCEINTES SUR LES CÔTÉS
+    cx.save();
+    // Oscillation des radars (ils "écoutent" l'environnement)
+    const radarPulse = Math.abs(Math.sin(t * 5)) * 0.15;
+    cx.fillStyle = '#0a0514'; cx.strokeStyle = col; cx.lineWidth = 2;
+    
+    // Radar Gauche
+    cx.beginPath(); cx.ellipse(-TSZ * 0.75, 0, TSZ * 0.15, TSZ * 0.35 + radarPulse*TSZ*0.3, 0, 0, Math.PI*2); cx.fill(); cx.stroke();
+    cx.beginPath(); cx.moveTo(-TSZ * 0.75, -TSZ*0.2); cx.lineTo(-TSZ*0.9 - radarPulse*TSZ*0.3, 0); cx.lineTo(-TSZ*0.75, TSZ*0.2); cx.stroke();
+    
+    // Radar Droit
+    cx.beginPath(); cx.ellipse(TSZ * 0.75, 0, TSZ * 0.15, TSZ * 0.35 + radarPulse*TSZ*0.3, 0, 0, Math.PI*2); cx.fill(); cx.stroke();
+    cx.beginPath(); cx.moveTo(TSZ * 0.75, -TSZ*0.2); cx.lineTo(TSZ*0.9 + radarPulse*TSZ*0.3, 0); cx.lineTo(TSZ*0.75, TSZ*0.2); cx.stroke();
+    cx.restore();
+
+    // 3. LE BLINDAGE PRINCIPAL (Structure octogonale)
+    cx.fillStyle = '#0a0514'; cx.strokeStyle = '#333'; cx.lineWidth = 4;
+    cx.beginPath();
+    for(let i=0; i<8; i++) {
+        const a = (i/8)*Math.PI*2 + Math.PI/8;
+        const r = 85;
+        if(i===0) cx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+        else cx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+    }
+    cx.closePath(); cx.fill(); cx.stroke();
+
+    cx.strokeStyle = col; cx.lineWidth = 2;
+    cx.beginPath(); cx.arc(0, 0, 70, 0, Math.PI*2); cx.stroke();
+    for(let i=0; i<4; i++) {
+        cx.save(); cx.rotate(i * Math.PI/2);
+        cx.fillStyle = '#111'; cx.fillRect(-20, -95, 40, 20);
+        cx.strokeRect(-20, -95, 40, 20);
+        cx.restore();
+    }
+
+    // 4. L'ŒIL / GRILLE MICROPHONE
+    glow(col, 30); cx.fillStyle = 'rgba(138, 43, 226, 0.2)';
+    cx.beginPath(); cx.arc(0, 0, 50, 0, Math.PI*2); cx.fill();
+    cx.strokeStyle = col; cx.lineWidth = 4; cx.stroke(); noGlow();
+
+    // Traqueur auditif qui suit la souris
+    let tx = clamp((mx - cX)*0.05, -25, 25);
+    let ty = clamp((my - cY)*0.05, -25, 25);
+    eyeTrackX += (tx - eyeTrackX) * 0.1;
+    eyeTrackY += (ty - eyeTrackY) * 0.1;
+    
+    cx.save(); cx.translate(eyeTrackX, eyeTrackY);
+    glow('#fff', 15); cx.fillStyle = '#111'; // Sombre comme un micro
+    cx.beginPath(); cx.arc(0, 0, 22, 0, Math.PI*2); cx.fill(); cx.stroke(); noGlow();
+    
+    // Fentes de la grille microphone
+    cx.strokeStyle = col; cx.lineWidth = 1.5;
+    cx.beginPath();
+    for(let j=-3; j<=3; j++) {
+        let w = Math.sqrt(20*20 - (j*5)*(j*5)); // Largeur du cercle
+        cx.moveTo(-w, j*5); cx.lineTo(w, j*5);
+    }
+    cx.stroke();
+
+    cx.restore();
+    cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PHASE 2 : LE FANTÔME (Squelette Arachnéen Furtif)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawPhase2(t) {
+    const col = '#00F5FF'; // Cyan
+    const TSZ = 100;
+    cx.save();
+    
+    cx.translate(cX + Math.sin(t*3)*20, cY + Math.cos(t*2)*20);
+    cx.scale(1.5, 1.5);
+
+    // 1. SIMULATION DU SCANNER DU JOUEUR
+    const distToMouse = Math.hypot(mx - cX, my - cY);
+    const inScanner = distToMouse < 300;
+    
+    if (inScanner) {
+        cx.globalCompositeOperation = 'screen';
+        glow(col, 40); cx.fillStyle = `rgba(0, 245, 255, 0.15)`;
+        cx.beginPath(); cx.arc(0, 0, 120, 0, Math.PI*2); cx.fill();
+        cx.globalCompositeOperation = 'source-over'; noGlow();
+    }
+
+    // Opacité : Invisible si pas scanné
+    const baseAlpha = inScanner ? 1 : 0.15; 
+    cx.globalAlpha = baseAlpha;
+
+    // Tremblement de panique (Squelette à vif)
+    const twitchX = (Math.random() - 0.5) * 8;
+    const twitchY = (Math.random() - 0.5) * 8;
+    cx.translate(twitchX, twitchY);
+
+    glow(col, 15);
+    
+    // 2. PATTES ARACHNÉENNES BRISÉES
+    cx.strokeStyle = `rgba(0, 245, 255, 0.8)`;
+    cx.lineWidth = 3;
+    for (let i = 0; i < 6; i++) {
+        cx.save();
+        const legAngle = (i / 6) * Math.PI * 2 + t * 0.5;
+        cx.rotate(legAngle);
+        
+        // Articulations cassées
+        cx.beginPath();
+        cx.moveTo(0, 0);
+        cx.lineTo(TSZ * 0.45, -TSZ * 0.2);
+        cx.lineTo(TSZ * 0.7 + Math.sin(t*15 + i)*15, Math.random() * 10);
+        cx.stroke();
+        cx.restore();
+    }
+
+    // 3. CŒUR EXPOSÉ (Noyau géométrique instable)
+    cx.fillStyle = '#001a1a';
+    cx.beginPath();
+    for(let i=0; i<Math.PI*2; i+=0.5) {
+        let r = TSZ * 0.3 + Math.random()*5;
+        if(i===0) cx.moveTo(Math.cos(i)*r, Math.sin(i)*r);
+        else cx.lineTo(Math.cos(i)*r, Math.sin(i)*r);
+    }
+    cx.closePath(); cx.fill(); cx.stroke();
+
+    // 4. L'ŒIL PANIQUÉ
+    cx.fillStyle = '#fff';
+    cx.shadowBlur = 22; cx.shadowColor = '#fff';
+    cx.beginPath(); cx.arc(0, 0, TSZ * 0.15 + Math.sin(t * 20) * 3, 0, Math.PI * 2); cx.fill();
+    
+    // Pupille minuscule et terrorisée
+    noGlow(); cx.fillStyle = '#000';
+    cx.beginPath(); cx.arc(0, 0, 4, 0, Math.PI * 2); cx.fill();
+
+    // Étincelles de court-circuit
+    if(Math.random() < 0.3) {
+        cx.fillStyle = '#fff';
+        cx.fillRect((Math.random()-.5)*TSZ*0.6, (Math.random()-.5)*TSZ*0.6, 3, 3);
+    }
+
+    cx.globalAlpha = 1;
+    cx.restore(); noGlow();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  PHASE 3 : EXTERMINATION (Rage Mécanique)
+// ═════════════════════════════════════════════════════════════════════════════
+function drawPhase3(t) {
+    const col = '#FF003C'; // Rouge pur
+    cx.save();
+    // Lévitation agressive et tremblement
+    cx.translate(cX + (Math.random()-0.5)*4, cY + Math.sin(t*5)*10 + (Math.random()-0.5)*4);
+    cx.scale(1.5, 1.5);
+
+    glow(col, 40);
+
+    // 1. CORPS MÉTALLIQUE ÉCLATÉ (Glitch Spikes)
+    cx.fillStyle = 'rgba(40, 0, 10, 0.8)';
+    cx.strokeStyle = col; cx.lineWidth = 4;
+    cx.beginPath();
+    for(let i=0; i<Math.PI*2; i+=0.15) {
+        // Pointes aléatoires ultra nerveuses
+        const spike = Math.random() > 0.8 ? 40 : 0;
+        const r = 70 + Math.sin(t*15 + i*8)*10 + spike;
+        if(i===0) cx.moveTo(Math.cos(i)*r, Math.sin(i)*r);
+        else cx.lineTo(Math.cos(i)*r, Math.sin(i)*r);
+    }
+    cx.closePath(); cx.fill(); cx.stroke();
+
+    // 2. LES 3 YEUX D'EXTERMINATION
+    noGlow();
+    const eyeOffset = 35, eyeRadius = 20;
+    for(let k=0; k<3; k++) {
+        // Position en triangle
+        const ea = k*Math.PI*2/3 - Math.PI/2;
+        const ex = Math.cos(ea)*eyeOffset, ey = Math.sin(ea)*eyeOffset;
+        
+        // Tracking ultra-rapide
+        const edx = mx - (cX + ex*1.5), edy = my - (cY + ey*1.5);
+        const lookA = Math.atan2(edy, edx);
+        const ld = Math.min(Math.hypot(edx, edy)*0.1, eyeRadius*0.5);
+
+        cx.save(); cx.translate(ex, ey);
+        // Oeil Blanc
+        glow(col, 20); cx.fillStyle = '#fff';
+        cx.beginPath(); cx.arc(0, 0, eyeRadius + Math.sin(t*20+k)*3, 0, Math.PI*2); cx.fill(); noGlow();
+        
+        // Pupille Rouge Verrouillée
+        cx.translate(Math.cos(lookA)*ld, Math.sin(lookA)*ld);
+        cx.fillStyle = '#000';
+        cx.beginPath(); cx.arc(0, 0, eyeRadius*0.5, 0, Math.PI*2); cx.fill();
+        
+        // Fente Rouge
+        cx.fillStyle = col;
+        cx.save(); cx.rotate(lookA); cx.fillRect(-2, -(eyeRadius*0.6), 4, eyeRadius*1.2); cx.restore();
+        cx.restore();
+    }
+
+    // 3. ANNEAUX D'AVERTISSEMENT
+    cx.globalCompositeOperation = 'screen';
+    glow(col, 20); cx.strokeStyle = `rgba(255,0,60,0.5)`; cx.lineWidth = 2;
+    cx.save(); cx.rotate(t*2); cx.beginPath(); cx.arc(0, 0, 110, 0, Math.PI*1.5); cx.stroke(); cx.restore();
+    cx.save(); cx.rotate(-t*3); cx.beginPath(); cx.arc(0, 0, 130, 0, Math.PI*1.2); cx.stroke(); cx.restore();
+    cx.globalCompositeOperation = 'source-over'; noGlow();
+
+    // 4. MOTS D'ALERTE EN ORBITE
+    cx.font = `bold 14px 'Share Tech Mono', monospace`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    for(let i=0; i<ALERT_WORDS.length; i++) {
+        const wa = t*1.2 + i*Math.PI*2/ALERT_WORDS.length; // Tourne très vite
+        const wr = 160 + Math.sin(t*8 + i)*15; // Tremblement du rayon
+        cx.save(); cx.translate(Math.cos(wa)*wr, Math.sin(wa)*wr);
+        cx.rotate(Math.sin(t*5+i)*0.2); // Les mots tremblent
+        
+        glow(col, 15); cx.fillStyle = col; cx.fillText(ALERT_WORDS[i], 0, 0); noGlow();
+        cx.globalAlpha = 0.8; cx.fillStyle = '#fff'; cx.fillText(ALERT_WORDS[i], 1, 1);
+        cx.restore();
+    }
+
+    cx.restore();
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  BOUCLE D'ANIMATION
+// ═════════════════════════════════════════════════════════════════════════════
+function loop(ts) {
+    let dt = ts - lastTime; lastTime = ts; globalT += dt;
+    const t = globalT / 1000;
+
+    cx.clearRect(0, 0, W, H);
+    drawDataVault(t, currentPhase);
+
+    if (currentPhase === 1) drawPhase1(t);
+    else if (currentPhase === 2) drawPhase2(t);
+    else drawPhase3(t);
+
+    // Ambiance de la salle selon la phase
+    const colPulse = phaseData[currentPhase].col;
+    let rgb = currentPhase === 1 ? '138,43,226' : (currentPhase === 2 ? '0,245,255' : '255,0,60');
+    cx.fillStyle = `rgba(${rgb}, ${0.03 + Math.sin(t*5)*0.02})`;
+    cx.fillRect(0, 0, W, H);
+
+    requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

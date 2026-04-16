@@ -1,0 +1,1786 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ReveB 2 — CHRONOS — Palier 40</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bangers&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box
+    }
+
+    html,
+    body {
+      background: #020005;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      cursor: none
+    }
+
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1
+    }
+
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 90;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .22) 50%), linear-gradient(90deg, rgba(0, 245, 255, .04), rgba(255, 215, 0, .025), rgba(138, 43, 226, .03));
+      background-size: 100% 2px, 3px 100%;
+      opacity: .55
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 89;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 10, .7) 80%, #000 120%)
+    }
+
+    #fx {
+      position: fixed;
+      inset: 0;
+      z-index: 88;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .05s
+    }
+
+    #tr {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transition: opacity .12s
+    }
+
+    #tr.show {
+      opacity: 1
+    }
+
+    .th {
+      flex: 1;
+      position: relative;
+      overflow: hidden
+    }
+
+    .th:first-child {
+      background: linear-gradient(135deg, #000a18, #020005);
+      border-bottom: 2px solid rgba(0, 245, 255, .7);
+      transition: transform .4s cubic-bezier(.86, 0, .07, 1)
+    }
+
+    .th:last-child {
+      background: linear-gradient(135deg, #08000f, #020005);
+      border-top: 2px solid rgba(255, 215, 0, .7);
+      transition: transform .4s cubic-bezier(.86, 0, .07, 1) .04s
+    }
+
+    #tr.open .th:first-child {
+      transform: translateY(-100%)
+    }
+
+    #tr.open .th:last-child {
+      transform: translateY(100%)
+    }
+
+    .tt {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: 900;
+      font-size: clamp(1.3rem, 3.8vw, 2.5rem);
+      letter-spacing: .15em;
+      color: #fff;
+      text-align: center;
+      text-shadow: 0 0 25px #00F5FF
+    }
+
+    .tt span {
+      display: block;
+      font-size: .36em;
+      letter-spacing: .3em;
+      opacity: .6;
+      margin-top: .3em;
+      color: #FFD700
+    }
+
+    .ono {
+      position: fixed;
+      font-family: 'Bangers', cursive;
+      font-weight: 900;
+      pointer-events: none;
+      z-index: 85;
+      letter-spacing: .04em;
+      white-space: pre;
+      line-height: 1;
+      text-align: center;
+      animation: oA .85s cubic-bezier(.22, 1, .36, 1) forwards;
+      text-shadow: 3px 3px 0 #000, -1px -1px 0 #000, 0 0 14px currentColor
+    }
+
+    @keyframes oA {
+      0% {
+        opacity: 1;
+        transform: scale(.25)
+      }
+
+      18% {
+        opacity: 1;
+        transform: scale(1.35)
+      }
+
+      55% {
+        opacity: 1;
+        transform: scale(1)
+      }
+
+      100% {
+        opacity: 0;
+        transform: scale(.85) translateY(-38px)
+      }
+    }
+
+    #boss-hud {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      pointer-events: none;
+      text-align: center;
+      min-width: 360px;
+      opacity: 0;
+      transition: opacity .5s
+    }
+
+    #boss-nm {
+      font-family: 'Orbitron', monospace;
+      font-size: 13px;
+      font-weight: 900;
+      letter-spacing: .2em;
+      margin-bottom: 8px;
+      color: #00F5FF;
+      text-shadow: 0 0 18px #00F5FF;
+      transition: color .5s, text-shadow .5s
+    }
+
+    #boss-bw {
+      width: 320px;
+      height: 10px;
+      background: #000a15;
+      border: 1px solid rgba(0, 245, 255, .4);
+      position: relative;
+      margin: 0 auto;
+      overflow: hidden;
+      display: none
+    }
+
+    #boss-b {
+      height: 100%;
+      background: linear-gradient(to right, #001830, #00F5FF, #FFD700);
+      box-shadow: 0 0 12px rgba(0, 245, 255, .6);
+      transition: width .2s
+    }
+
+    #boss-b::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, rgba(255, 255, 255, .25) 0, transparent 60%)
+    }
+
+    #boss-ph {
+      font-size: 9px;
+      color: rgba(0, 200, 255, .6);
+      letter-spacing: .14em;
+      margin-top: 5px;
+      transition: color .5s
+    }
+
+    #charge-hud {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      pointer-events: none;
+      text-align: center;
+      opacity: 0;
+      transition: opacity .4s
+    }
+
+    #charge-label {
+      font-family: 'Orbitron', monospace;
+      font-size: 9px;
+      letter-spacing: .15em;
+      color: #FFD700;
+      text-shadow: 0 0 10px #FFD700;
+      margin-bottom: 5px
+    }
+
+    #charge-segs {
+      display: flex;
+      gap: 4px;
+      justify-content: center
+    }
+
+    .cseg {
+      width: 22px;
+      height: 10px;
+      border: 1px solid rgba(255, 215, 0, .3);
+      background: transparent;
+      transition: background .3s, box-shadow .3s
+    }
+
+    .cseg.filled {
+      background: #FFD700;
+      box-shadow: 0 0 8px #FFD700, 0 0 20px rgba(255, 215, 0, .4)
+    }
+
+    #speed-hud {
+      position: fixed;
+      top: 85px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      pointer-events: none;
+      text-align: center;
+      opacity: 0;
+      transition: opacity .4s
+    }
+
+    #speed-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      letter-spacing: .1em;
+      color: #00F5FF;
+      text-shadow: 0 0 12px #00F5FF
+    }
+
+    #slowmo-hud {
+      position: fixed;
+      bottom: 14px;
+      left: 18px;
+      z-index: 20;
+      pointer-events: none;
+      font-size: 9px;
+      font-family: 'Orbitron', monospace;
+      color: #FFD700;
+      letter-spacing: .1em;
+      transition: opacity .3s;
+      text-align: left
+    }
+
+    #p3-timer {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 25;
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(60px, 10vw, 120px);
+      font-weight: 900;
+      color: #FF003C;
+      text-shadow: 0 0 40px #FF003C;
+      letter-spacing: .05em;
+      display: none;
+      pointer-events: none;
+      animation: timerPulse 1s infinite
+    }
+
+    @keyframes timerPulse {
+
+      0%,
+      100% {
+        transform: translate(-50%, -50%) scale(1)
+      }
+
+      50% {
+        transform: translate(-50%, -50%) scale(1.06)
+      }
+    }
+
+    #fire-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 22;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(255, 215, 0, .08) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity .3s
+    }
+
+    #fire-label {
+      position: fixed;
+      top: 38%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 23;
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(22px, 3.5vw, 40px);
+      font-weight: 900;
+      letter-spacing: .3em;
+      color: #FFD700;
+      text-shadow: 0 0 30px #FFD700;
+      pointer-events: none;
+      display: none;
+      animation: fireBlink .5s infinite alternate
+    }
+
+    @keyframes fireBlink {
+      from {
+        opacity: .35
+      }
+
+      to {
+        opacity: 1;
+        text-shadow: 0 0 60px #FFD700, 0 0 110px rgba(255, 215, 0, .6)
+      }
+    }
+
+    #dialog-box {
+      position: fixed;
+      bottom: 8%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: min(90vw, 700px);
+      background: rgba(2, 0, 8, .97);
+      border: 2px solid #00F5FF;
+      border-radius: 4px;
+      padding: 20px 28px;
+      z-index: 98;
+      display: none;
+      flex-direction: column;
+      box-shadow: 0 0 30px rgba(0, 245, 255, .5), inset 0 0 15px rgba(0, 245, 255, .1)
+    }
+
+    #dialog-box.show {
+      display: flex;
+      animation: fadeup .3s ease-out
+    }
+
+    @keyframes fadeup {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 15px)
+      }
+
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0)
+      }
+    }
+
+    #dialog-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: .1em;
+      margin-bottom: 12px;
+      text-shadow: 0 0 12px currentColor
+    }
+
+    #dialog-text {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #99ddff;
+      min-height: 52px
+    }
+
+    #dialog-hint {
+      align-self: flex-end;
+      font-size: 10px;
+      color: #556;
+      margin-top: 16px;
+      letter-spacing: .1em;
+      animation: blink 1.5s infinite
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .3
+      }
+    }
+
+    #death-menu {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 2, 12, .97);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center
+    }
+
+    #death-menu.show {
+      display: flex
+    }
+
+    .ebtn {
+      display: block;
+      width: min(420px, 88vw);
+      padding: 16px 24px;
+      margin: 7px 0;
+      background: rgba(0, 0, 0, .85);
+      border: 1px solid currentColor;
+      font-family: 'Orbitron', monospace;
+      font-size: 12px;
+      letter-spacing: .09em;
+      cursor: pointer;
+      transition: background .2s, box-shadow .2s, transform .1s;
+      text-align: left
+    }
+
+    .ebtn:hover {
+      background: rgba(255, 255, 255, .04);
+      box-shadow: 0 0 24px currentColor;
+      transform: translateX(4px)
+    }
+
+    .ebtn span {
+      display: block;
+      font-size: 10px;
+      opacity: .4;
+      margin-top: 4px;
+      font-family: 'Share Tech Mono', monospace;
+      letter-spacing: .04em
+    }
+
+    .ebtn-r {
+      color: #FF003C;
+      border-color: rgba(255, 0, 60, .4)
+    }
+
+    #p3-prompt {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      pointer-events: none;
+      text-align: center;
+      display: none
+    }
+
+    #p3-prompt-text {
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      letter-spacing: .15em;
+      padding: 10px 20px;
+      border: 2px solid;
+      border-radius: 4px;
+      animation: blink .5s infinite
+    }
+  </style>
+</head>
+
+<body>
+  <canvas id="c"></canvas>
+  <div id="crt"></div>
+  <div id="vignette"></div>
+  <div id="fx"></div>
+  <div id="tr">
+    <div class="th">
+      <div class="tt" id="t1"></div>
+    </div>
+    <div class="th">
+      <div class="tt" id="t2"></div>
+    </div>
+  </div>
+  <div id="boss-hud">
+    <div id="boss-nm">CHRONOS — LE MAÎTRE DU TEMPS</div>
+    <div id="boss-bw">
+      <div id="boss-b" style="width:100%"></div>
+    </div>
+    <div id="boss-ph">CHARGEMENT…</div>
+  </div>
+  <div id="speed-hud">
+    <div id="speed-val">VITESSE JEU: ×1 | JOUEUR: ×1</div>
+  </div>
+  <div id="slowmo-hud"></div>
+  <div id="charge-hud">
+    <div id="charge-label">CHARGE TEMPORELLE</div>
+    <div id="charge-segs">
+      <div class="cseg" id="cs0"></div>
+      <div class="cseg" id="cs1"></div>
+      <div class="cseg" id="cs2"></div>
+      <div class="cseg" id="cs3"></div>
+      <div class="cseg" id="cs4"></div>
+      <div class="cseg" id="cs5"></div>
+      <div class="cseg" id="cs6"></div>
+      <div class="cseg" id="cs7"></div>
+      <div class="cseg" id="cs8"></div>
+      <div class="cseg" id="cs9"></div>
+    </div>
+  </div>
+  <div id="fire-overlay"></div>
+  <div id="fire-label">⟩⟩ TIRER ⟨⟨</div>
+  <div id="p3-timer">15</div>
+  <div id="p3-prompt">
+    <div id="p3-prompt-text"></div>
+  </div>
+  <div id="dialog-box">
+    <div id="dialog-name"></div>
+    <div id="dialog-text"></div>
+    <div id="dialog-hint">[ ESPACE / CLIC POUR CONTINUER ]</div>
+  </div>
+  <div id="death-menu">
+    <h1
+      style="color:#FF003C;font-family:'Orbitron',sans-serif;font-size:clamp(28px,5vw,56px);margin-bottom:10px;text-shadow:0 0 30px #FF003C;font-weight:900">
+      EFFONDREMENT TEMPOREL</h1>
+    <p style="color:#556;font-family:'Share Tech Mono',monospace;font-size:16px;margin-bottom:40px;letter-spacing:.1em">
+      CHRONOS a dévoré votre ligne temporelle.</p>
+    <button class="ebtn ebtn-r" onclick="restartGame()">[ REMBOBINER ]<span>Relancer le combat depuis la Phase
+        1.</span></button>
+  </div>
+  <script src="stat.js"></script>
+  <script src="joueur.js"></script>
+  <script src="menu/succes_global.js"></script>
+  <script>
+    "use strict";
+
+
+    // ─── MUSIQUE DU BOSS ───
+    const bgm = new Audio("music/boss40.mp3");
+    bgm.loop = true;
+    bgm.volume = 1;
+
+
+    // ═══ CANVAS & RESIZE
+    const cv = document.getElementById('c'), cx = cv.getContext('2d');
+    let W, H;
+    function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; relayout(); }
+    window.addEventListener('resize', resize);
+
+    // ═══ CONSTANTS
+    const K = { red: '#FF003C', blue: '#00F5FF', gold: '#FFD700', pur: '#8A2BE2', wh: '#fff', bk: '#000', green: '#00FF41', pink: '#FF10F0' };
+    const T = { HOLE: 0, SOLID: 1, PORTAL: 3 };
+    const ST = { PLAY: 2, DEAD: 3, WIN: 4 };
+    const BST = { INTRO: 0, P1: 1, TRANS: 2, P2: 3, P3: 4, DYING: 5, END: 6 };
+    const GCOLS = 7, GROWS = 4;
+
+    // ═══ LAYOUT (2D flat arena)
+    let arenaX = 0, arenaY = 0, arenaW = 0, arenaH = 0, tileW = 80, tileH = 60;
+    let BSCL = 1, bossX = 400, bossY = 200, clockR = 60, TSZ = 60, gSize = 28;
+    let timeSand = [];
+
+    // ═══ GAME STATE
+    let bossState = BST.INTRO, st = ST.PLAY;
+    let grid = [], parts = [], shakes = [], dTiles = [], traps = [];
+    let score = 0, best = 0, lives = 3, maxLives = 3, col = 'blue';
+    let bT = 0, lastT = 0, globalTime = 0;
+    let _tr = false, _ft = null, _glitchT = 0;
+    let rmb = false, lmb = false, mx = 400, my = 300;
+    let isDialogActive = false;
+
+    // ═══ RELAYOUT
+    function relayout() {
+      BSCL = Math.min(W / 1500, H / 880, 1.0);
+      bossX = W / 2; bossY = H * 0.25;
+      clockR = 60 * BSCL;
+      const bossBtm = bossY + 230 * BSCL;
+      arenaY = Math.max(bossBtm + 10, H * 0.51);
+      const availH = H - arenaY - 14;
+      tileH = Math.max(availH / GROWS, 16);
+      tileW = Math.min(W * 0.62 / GCOLS, tileH * 2.0, 110);
+      arenaW = tileW * GCOLS; arenaH = tileH * GROWS;
+      arenaX = (W - arenaW) / 2;
+      TSZ = tileW * 0.76;
+      // IsoX/Y needed by joueur.js — map to 2D
+    }
+    // joueur.js needs px2/py2 as functions returning screen coords from grid coords
+    const px2 = gx => arenaX + gx * tileW + tileW / 2;
+    const py2 = gy => arenaY + gy * tileH + tileH / 2;
+    function cellX(gx) { return arenaX + gx * tileW + tileW / 2; }
+    function cellY(gy) { return arenaY + gy * tileH + tileH / 2; }
+    function inB(x, y) { return x >= 0 && y >= 0 && x < GCOLS && y < GROWS; }
+    function solid(x, y) { if (!inB(x, y)) return false; const v = grid[y]?.[x]; return v === T.SOLID || v === T.PORTAL; }
+    function isOnSafe() { return false; }
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+    const rng = (a, b) => a + Math.random() * (b - a);
+    const irng = (a, b) => Math.floor(rng(a, b + 1));
+
+    // ═══ GLOBALS REQUIS PAR joueur.js
+    let torches = [];           // joueur.js peut y accéder
+    let OX = 0, OY = 0;           // aliases isométriques (non utilisés en 2D mais déclarés)
+
+    // ═══ AUDIO — créé seulement après un geste utilisateur
+    let aC = null, audioReady = false;
+    function unlockAudio() {
+      if (audioReady) return;
+      try {
+        aC = new (window.AudioContext || window.webkitAudioContext)();
+        audioReady = true;
+
+        // Lancement de la musique de fond au premier clic/touche
+        bgm.play().catch(e => console.log("Musique bloquée par le navigateur :", e));
+
+      } catch (e) {
+        console.error("Erreur AudioContext:", e);
+      }
+    }
+
+
+    function au() { if (!audioReady) return null; if (aC.state === 'suspended') aC.resume(); return aC; }
+    function tone(f, tp, d, v = 0.08) { try { const a = au(); if (!a) return; const o = a.createOscillator(), g = a.createGain(); o.connect(g); g.connect(a.destination); o.type = tp; o.frequency.value = f; g.gain.setValueAtTime(v, a.currentTime); g.gain.exponentialRampToValueAtTime(0.001, a.currentTime + d); o.start(); o.stop(a.currentTime + d); } catch (e) { } }
+    const sfx = {
+      move: () => tone(380, 'square', .06, .035),
+      dash: () => { tone(520, 'triangle', .1, .07); tone(780, 'sine', .08, .04); },
+      hit: () => tone(160, 'sawtooth', .22, .14),
+      die: () => { tone(80, 'sawtooth', .7, .22); tone(50, 'square', .5, .17); },
+      alert: () => tone(880, 'square', .07, .08),
+      laser: () => { tone(400, 'sawtooth', .25, .12); tone(200, 'square', .3, .1); },
+      clockTick: () => tone(1200, 'sine', .08, .06),
+      chime: () => { tone(1320, 'sine', .4, .09); tone(1980, 'sine', .35, .06); tone(2640, 'sine', .3, .04); },
+      charge: () => tone(440 + chargeLevel * 55, 'sawtooth', .3, .1),
+      fire: () => { tone(80, 'square', .6, .35); tone(50, 'sawtooth', .55, .5); tone(200, 'sine', .4, .18); },
+      shadow: () => tone(220, 'triangle', .15, .08),
+      explode: () => { tone(100, 'square', .5, .28); tone(60, 'sawtooth', .6, .32); },
+      terminal: () => { tone(440, 'sine', .1, .12); tone(660, 'sine', .1, .09); tone(880, 'sine', .1, .07); }
+    };
+
+    // ═══ VISUAL EFFECTS
+    const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+    const noGlow = () => { cx.shadowBlur = 0; };
+    function spark(x, y, c, n, sp, li) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = sp * (.4 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, c, life: li, ml: li, sz: 1.5 + Math.random() * 2.5, g: .04 }); } }
+    function burst(x, y, c, n, sp, li) { for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, s = sp * (.6 + Math.random()); parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s - 1, c, life: li, ml: li, sz: 2 + Math.random() * 3.5, g: .1, sq: true }); } }
+    function ring(x, y, c, r) { parts.push({ x, y, vx: 0, vy: 0, c, life: 380, ml: 380, sz: r, g: 0, ring: true, r0: r }); }
+    function addSh(i, d) { shakes.push({ i, d, t: 0 }); }
+    function getSh() { let ox = 0, oy = 0; for (const s of shakes) { const p = 1 - s.t / s.d; ox += (Math.random() - .5) * s.i * p * 2; oy += (Math.random() - .5) * s.i * p * 2; } return { x: ox, y: oy }; }
+    function fScr(c, d) { c = c || '#fff'; d = d || 80; if (_ft) clearTimeout(_ft); fxEl.style.background = c; fxEl.style.opacity = '.45'; _ft = setTimeout(() => fxEl.style.opacity = '0', d); }
+    function triggerGlitch(dur) { _glitchT = dur; }
+    function ono(t, x, y, c) { const el = document.createElement('div'); el.className = 'ono'; el.style.left = `${clamp(x - 40, 5, W - 140)}px`; el.style.top = `${clamp(y - 20, 5, H - 60)}px`; el.style.fontSize = `${1.1 + Math.random() * 1.2}rem`; el.style.color = c || K.wh; el.textContent = t; document.body.appendChild(el); setTimeout(() => el.remove(), 850); }
+    function pageFlip(ti, su, cb) { if (_tr) { if (cb) cb(); return; } _tr = true; t1El.innerHTML = `${ti}<span>${su}</span>`; t2El.innerHTML = `${ti}<span>${su}</span>`; trEl.classList.add('show'); setTimeout(() => { trEl.classList.add('open'); fScr(K.blue, 90); if (cb) cb(); }, 430); setTimeout(() => { trEl.classList.remove('show', 'open'); _tr = false; }, 1100); }
+    function drawParts() { for (const p of parts) { if (p.ring) { const a = p.life / p.ml; cx.strokeStyle = p.c; cx.globalAlpha = a * .7; cx.lineWidth = 2.5 * a; glow(p.c, 12 * a); cx.beginPath(); cx.arc(p.x, p.y, p.r0 * (2.2 - 1.2 * a), 0, Math.PI * 2); cx.stroke(); cx.globalAlpha = 1; cx.shadowBlur = 0; } else { const a = p.life / p.ml; cx.globalAlpha = a; cx.fillStyle = p.c; glow(p.c, 8 * a); const sz = p.sz * a; if (p.sq) cx.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz); else { cx.beginPath(); cx.arc(p.x, p.y, sz, 0, Math.PI * 2); cx.fill(); } cx.globalAlpha = 1; cx.shadowBlur = 0; } } cx.shadowBlur = 0; }
+
+    // ═══ DOM REFS
+    const fxEl = document.getElementById('fx');
+    const t1El = document.getElementById('t1'), t2El = document.getElementById('t2'), trEl = document.getElementById('tr');
+    const bossHUD = document.getElementById('boss-hud');
+    const bossBarEl = document.getElementById('boss-b'), bossPhEl = document.getElementById('boss-ph'), bossNmEl = document.getElementById('boss-nm');
+    const chargeHUD = document.getElementById('charge-hud');
+    const speedHUD = document.getElementById('speed-hud'), speedValEl = document.getElementById('speed-val');
+    const p3TimerEl = document.getElementById('p3-timer');
+    const fireOverlay = document.getElementById('fire-overlay');
+    const fireLabelEl = document.getElementById('fire-label');
+    const p3PromptEl = document.getElementById('p3-prompt'), p3PromptText = document.getElementById('p3-prompt-text');
+
+    // ═══ DIALOGUE ENGINE
+    let currentDialogues = [], currentDiagIdx = 0, onDialogueEnd = null;
+    let typeWriterInterval = null, currentDiagText = '', isTyping = false;
+    function startDialogue(dialogues, callback) { isDialogActive = true; currentDialogues = dialogues; currentDiagIdx = 0; onDialogueEnd = callback; document.getElementById('dialog-box').classList.add('show'); showNextDialogue(); }
+    function showNextDialogue() { const textEl = document.getElementById('dialog-text'); if (isTyping) { clearInterval(typeWriterInterval); textEl.textContent = currentDiagText; isTyping = false; return; } if (currentDiagIdx >= currentDialogues.length) { isDialogActive = false; document.getElementById('dialog-box').classList.remove('show'); if (onDialogueEnd) onDialogueEnd(); return; } const d = currentDialogues[currentDiagIdx]; document.getElementById('dialog-name').textContent = d.name; document.getElementById('dialog-name').style.color = d.color; document.getElementById('dialog-box').style.borderColor = d.color; document.getElementById('dialog-box').style.boxShadow = `0 0 30px ${d.color}66,inset 0 0 15px ${d.color}22`; currentDiagText = d.text; textEl.textContent = ''; isTyping = true; let i = 0; clearInterval(typeWriterInterval); typeWriterInterval = setInterval(() => { textEl.textContent += currentDiagText[i]; i++; if (i >= currentDiagText.length) { clearInterval(typeWriterInterval); isTyping = false; } }, 24); try { sfx.move(); } catch (e) { } currentDiagIdx++; }
+
+    // ═══ LOCALSTORAGE
+    try {
+      const pre = JSON.parse(localStorage.getItem('rvb2_preBoss') || 'null');
+      if (pre) {
+        score = pre.score || 0;
+        maxLives = pre.maxLives || 3;
+        lives = maxLives; // <-- FORCE FULL VIE AU LANCEMENT
+        col = pre.col || 'blue';
+      }
+    } catch (e) { }
+    try { const bs = JSON.parse(localStorage.getItem('rvb2v6') || '{}'); best = bs.b || 0; } catch (e) { }
+
+    // ═══ GRID
+    const spawnP1 = { x: 3, y: 2 }, spawnP2 = { x: 3, y: 2 }, spawnP3 = { x: 3, y: 1 };
+    const TERMINALS = {
+      left: { gx: 0, gy: 2, label: '[ FORMATEZ ]', color: K.red },
+      up: { gx: 3, gy: 0, label: '[ FUSIONNEZ ]', color: K.gold },
+      right: { gx: 6, gy: 2, label: '[ ÉPARGNEZ ]', color: K.green }
+    };
+    function buildGrid(type) {
+      grid = Array.from({ length: GROWS }, () => Array(GCOLS).fill(T.HOLE));
+      if (type === 'full') { for (let y = 0; y < GROWS; y++)for (let x = 0; x < GCOLS; x++)grid[y][x] = T.SOLID; }
+      else if (type === 'cross') {
+        for (let y = 0; y < GROWS; y++)grid[y][3] = T.SOLID;
+        for (let x = 0; x < GCOLS; x++)grid[2][x] = T.SOLID;
+        for (let x = 0; x < GCOLS; x++)grid[1][x] = T.SOLID;
+        grid[TERMINALS.left.gy][TERMINALS.left.gx] = T.PORTAL;
+        grid[TERMINALS.up.gy][TERMINALS.up.gx] = T.PORTAL;
+        grid[TERMINALS.right.gy][TERMINALS.right.gx] = T.PORTAL;
+      }
+    }
+
+    // ═══ PLAYER
+    const pl = new Joueur();
+    pl.kill = function () {
+      if (!this.alive) return; this.alive = false; sfx.die();
+      burst(this.px, this.py, K.red, 45, 7, 850); ring(this.px, this.py, K.red, TSZ * 1.5);
+      addSh(16, 500); fScr(K.red, 350); triggerGlitch(400);
+      setTimeout(() => {
+        lives = Math.max(0, lives - 1);
+        if (lives <= 0) { document.getElementById('death-menu').classList.add('show'); st = ST.DEAD; return; }
+        const sp = bossState === BST.P2 ? spawnP2 : (bossState === BST.P3 ? spawnP3 : spawnP1);
+        this.reset(sp.x, sp.y); this.inv = 2000;
+      }, 2000);
+    };
+
+
+    function restartGame() {
+      document.getElementById('death-menu').classList.remove('show');
+      lives = maxLives; // <-- REMET LES VIES AU MAX
+      st = ST.PLAY;
+      score = 0;
+      bossState = BST.P1;
+      resetP1();
+      buildGrid('full');
+      pl.reset(spawnP1.x, spawnP1.y);
+      pl.inv = 1800;
+    }
+
+
+    // ═══ PHASE 1 CONSTANTS & STATE
+    const TURN_DURATION_P1 = 6000, TURNS_TO_SURVIVE = 10, BOSS_MAX_HP = 100, SHOT_DAMAGE = 25;
+    const GAME_SPEED_MODS = [1, 1, 2, 3, 4], PLAYER_SPEED_MODS = [1, 1, 0.5, 0.33, 0.25];
+    const GAME_MOD_LABELS = ['×1', '×1', '×2', '×3', '×4'], PLAYER_MOD_LABELS = ['×1', '×1', '÷2', '÷3', '÷4'];
+    let gameSpeedMod = 1, playerSpeedMod = 1, bossHP = BOSS_MAX_HP, chargeLevel = 0, fireMode = false, fireModeTimer = 0;
+    const FIRE_MODE_DURATION = 10000;
+    let p1 = { elapsed: 0, turnTimer: 0, turnCount: 0, bigHandAngle: -Math.PI / 2, bigHandRaw: 0, smallHandRaw: 0 };
+
+    // Lasers: 4 per side (one per row), stored as array of {side:'L'|'R', gy, active, charge, ...}
+    let lasers = [];
+    function initLasers() {
+      lasers = [];
+      for (let gy = 0; gy < GROWS; gy++) {
+        lasers.push({ side: 'L', gy, active: false, charge: 0, chargeMax: 2200, activeDur: 0, activeDurMax: 1800, warmupFlicker: 0 });
+        lasers.push({ side: 'R', gy, active: false, charge: 0, chargeMax: 2200, activeDur: 0, activeDurMax: 1800, warmupFlicker: 0 });
+      }
+      syncTraps();
+    }
+    function syncTraps() { traps = lasers.filter(l => l.active).map(l => ({ k: 'laser', ax: 'h', rc: l.gy, fir: true })); }
+
+    // Saw
+    let sawProgress = 0, sawPath = [];
+    function buildSawPath() { sawPath = []; for (let x = 0; x < GCOLS; x++)sawPath.push({ gx: x, gy: 0 }); for (let y = 1; y < GROWS; y++)sawPath.push({ gx: GCOLS - 1, gy: y }); for (let x = GCOLS - 2; x >= 0; x--)sawPath.push({ gx: x, gy: GROWS - 1 }); for (let y = GROWS - 2; y >= 1; y--)sawPath.push({ gx: 0, gy: y }); }
+    function getSawTile(progress) { const len = sawPath.length; return sawPath[Math.floor(((progress % len) + len) % len)]; }
+
+    function resetP1() {
+      p1 = { elapsed: 0, turnTimer: 0, turnCount: 0, bigHandAngle: 0, bigHandRaw: 0, smallHandRaw: 0 };
+      chargeLevel = 0; fireMode = false; fireModeTimer = 0; gameSpeedMod = 1; playerSpeedMod = 1; pl.MD = 88;
+      sawProgress = 0; initLasers(); buildSawPath(); updateChargeUI(); updateSpeedUI(); bossHP = BOSS_MAX_HP; updateBossHP();
+
+      // CORRECTION : On masque de force l'overlay et le texte de tir
+      const fireOverlay = document.getElementById('fire-overlay');
+      const fireLabelEl = document.getElementById('fire-label');
+      if (fireOverlay) fireOverlay.style.opacity = '0';
+      if (fireLabelEl) fireLabelEl.style.display = 'none';
+    }
+
+    function startP1() {
+      bossState = BST.P1; buildGrid('full'); resetP1();
+      bossPhEl.textContent = 'PHASE 1 — LE FUTUR — SURVIE 10 TOURS';
+      bossHUD.style.opacity = '1'; chargeHUD.style.opacity = '1'; speedHUD.style.opacity = '1';
+
+      // CORRECTION : On affiche la barre de vie dès la Phase 1 !
+      document.getElementById('boss-bw').style.display = 'block';
+
+      pl.reset(spawnP1.x, spawnP1.y); pl.inv = 1800;
+      startDialogue([
+        { name: 'SYSTÈME', color: K.blue, text: 'CONNEXION SECTORIELLE 40 ÉTABLIE… ENTITÉ TEMPORELLE PRIMORDIALE DÉTECTÉE.' },
+        { name: 'CHRONOS', color: K.gold, text: '…Tu oses entrer dans mon domaine ? Chaque seconde qui passe te rapproche de ta fin, petite chose.' },
+        { name: 'CHRONOS', color: K.gold, text: 'Je contrôle le temps lui-même. Surveille mes aiguilles… elles dicteront ton sort.' },
+        { name: 'SYSTÈME', color: K.blue, text: 'PROTOCOLE : Survivez 10 tours du cadran. Chargez votre attaque et TIREZ sur CHRONOS !' }
+      ], () => { });
+    }
+    function onTurnComplete() {
+      p1.turnCount++; sfx.clockTick(); sfx.chime(); addSh(4, 200);
+      chargeLevel = Math.min(10, chargeLevel + 1); updateChargeUI();
+      const gi = irng(0, GAME_SPEED_MODS.length - 1), pi = irng(0, PLAYER_SPEED_MODS.length - 1);
+      gameSpeedMod = GAME_SPEED_MODS[gi]; playerSpeedMod = PLAYER_SPEED_MODS[pi]; pl.MD = Math.round(88 / playerSpeedMod);
+      updateSpeedUI(GAME_MOD_LABELS[gi], PLAYER_MOD_LABELS[pi]);
+      burst(bossX, bossY, K.gold, 15, 4, 400); spark(W / 2, arenaY - 24, K.blue, 10, 3, 300);
+      if (chargeLevel >= 10) activateFireMode();
+      if (p1.turnCount >= TURNS_TO_SURVIVE && !fireMode) setTimeout(transitionToP2, 1200);
+    }
+    function activateFireMode() {
+      fireMode = true; fireModeTimer = 0;
+      fireOverlay.style.opacity = '1'; fireLabelEl.style.display = 'block';
+      sfx.charge(); addSh(6, 300); fScr(K.gold, 200);
+    }
+    function deactivateFireMode() {
+      fireMode = false; fireModeTimer = 0;
+      fireOverlay.style.opacity = '0'; fireLabelEl.style.display = 'none';
+      chargeLevel = 0; updateChargeUI();
+      if (p1.turnCount >= TURNS_TO_SURVIVE) setTimeout(transitionToP2, 1200);
+    }
+    function onPlayerFire() {
+      if (!fireMode) return; sfx.fire();
+      bossHP = Math.max(0, bossHP - SHOT_DAMAGE); updateBossHP();
+      burst(bossX, bossY, K.gold, 40, 6, 600); ring(bossX, bossY, K.gold, clockR * 2);
+      burst(bossX, bossY, K.blue, 20, 4, 500); addSh(12, 400); fScr(K.gold, 300); triggerGlitch(300);
+      ono('IMPACT TEMPOREL!', bossX - 60, bossY - 80 * BSCL, K.gold);
+      deactivateFireMode();
+    }
+    function updateLasers(dt) {
+      const spd = gameSpeedMod;
+      const nActive = lasers.filter(l => l.active || l.charge > 0).length;
+      for (const lsr of lasers) {
+        if (lsr.active) {
+          lsr.activeDur += dt * spd;
+          if (pl.alive && !pl.inv && pl.gy === lsr.gy) pl.hurt();
+          if (bossState === BST.P2 && p2Shadow.gx >= 0 && p2Shadow.gy === lsr.gy) onShadowHit();
+          if (lsr.activeDur >= lsr.activeDurMax) { lsr.active = false; lsr.charge = 0; lsr.activeDur = 0; }
+        } else if (lsr.charge > 0) {
+          lsr.charge += dt * spd; lsr.warmupFlicker = Math.random();
+          if (lsr.charge >= lsr.chargeMax) { lsr.active = true; lsr.charge = 0; lsr.activeDur = 0; sfx.laser(); addSh(5, 180); fScr(bossState === BST.P2 ? K.pink : K.blue, 80); }
+        }
+      }
+      if (nActive < 3 && Math.random() < 0.006 * gameSpeedMod) {
+        const avail = lasers.filter(l => !l.active && l.charge === 0);
+        if (avail.length > 0) { avail[irng(0, avail.length - 1)].charge = 1; sfx.alert(); }
+      }
+      syncTraps();
+    }
+    function updateSaw(dt, clockwise) {
+      sawProgress += 1.8 * gameSpeedMod * (clockwise ? 1 : -1) * dt / 1000;
+      const len = sawPath.length; sawProgress = ((sawProgress % len) + len) % len;
+      const tile = getSawTile(sawProgress);
+      if (pl.alive && !pl.inv && pl.gx === tile.gx && pl.gy === tile.gy) pl.hurt();
+    }
+    function updateP1(dt) {
+      p1.elapsed += dt;
+
+      // L'aiguille avance selon le temps
+      p1.bigHandRaw += dt / TURN_DURATION_P1 * Math.PI * 2;
+      p1.bigHandAngle = p1.bigHandRaw;
+
+      p1.smallHandRaw += dt / (TURN_DURATION_P1 * TURNS_TO_SURVIVE) * Math.PI * 2;
+
+      // NOUVEAU: On calcule le nombre de tours complets (passage par 0 / Haut)
+      const toursComplets = Math.floor(p1.bigHandRaw / (Math.PI * 2));
+
+      // Si un tour complet vient d'être franchi (et que ce n'est pas le départ 0)
+      if (toursComplets > p1.turnCount && p1.turnCount < TURNS_TO_SURVIVE) {
+        onTurnComplete(); // Cette fonction ajoute +1 de charge et incrémente p1.turnCount
+      }
+
+      if (fireMode) { fireModeTimer += dt; if (fireModeTimer >= FIRE_MODE_DURATION) deactivateFireMode(); }
+
+      updateLasers(dt); updateSaw(dt, true); pl.update(dt);
+    }
+
+    // ═══ TRANSITION P1→P2
+    function transitionToP2() {
+      if (bossState !== BST.P1) return; bossState = BST.TRANS;
+      startDialogue([
+        { name: 'CHRONOS', color: K.pink, text: "Impressionnant… tu as survécu à mon futur. Mais mon passé est une prison dont personne ne s'échappe." },
+        { name: 'CHRONOS', color: K.pink, text: 'Ton ombre va te trahir. Chaque pas que tu fais... ton reflet le répète, une seconde plus tard.' },
+        { name: 'SYSTÈME', color: K.red, text: 'PHASE 2 : La barre de vie de CHRONOS est révélée. Videz-la pour le vaincre !' }
+      ], startP2);
+    }
+
+    // ═══ PHASE 2
+    const TURN_DURATION_P2 = 4500, CHARGE_PER_TURN_P2 = 3;
+    let p2Shadow = { posHistory: [], gx: -999, gy: -999, px: 0, py: 0, lastHit: 0 };
+    function onShadowHit() {
+      if (bT - p2Shadow.lastHit < 1500) return; p2Shadow.lastHit = bT; pl.hurt();
+      burst(p2Shadow.px, p2Shadow.py, K.pink, 24, 5, 450); addSh(10, 300); fScr(K.pink, 200);
+      ono('OMBRE TOUCHÉE!', p2Shadow.px, p2Shadow.py - 30, K.pink); sfx.shadow();
+    }
+    let p2 = { turnTimer: 0 };
+    function startP2() {
+      bossState = BST.P2; buildGrid('full'); chargeLevel = 0; updateChargeUI();
+      p2.turnTimer = 0; p2Shadow = { posHistory: [], gx: -999, gy: -999, px: 0, py: 0, lastHit: 0 };
+      gameSpeedMod = 1; playerSpeedMod = 1; pl.MD = 88; sawProgress = 0; initLasers(); buildSawPath();
+      bossNmEl.style.color = K.pink; bossNmEl.style.textShadow = `0 0 18px ${K.pink}`;
+      bossPhEl.textContent = 'PHASE 2 — LE PASSÉ — VIDEZ LA BARRE DE VIE';
+      bossPhEl.style.color = 'rgba(255,16,240,0.6)';
+      document.getElementById('boss-bw').style.display = 'block'; updateBossHP();
+      pl.reset(spawnP2.x, spawnP2.y); pl.inv = 1800;
+
+      // CORRECTION : On s'assure que le texte de tir disparaît bien en entrant en Phase 2
+      fireMode = false;
+      fireModeTimer = 0;
+      const fireOverlay = document.getElementById('fire-overlay');
+      const fireLabelEl = document.getElementById('fire-label');
+      if (fireOverlay) fireOverlay.style.opacity = '0';
+      if (fireLabelEl) fireLabelEl.style.display = 'none';
+    }
+    function updateP2(dt) {
+      p2.turnTimer += dt * gameSpeedMod;
+      p1.bigHandRaw += dt / TURN_DURATION_P2 * Math.PI * 2;
+      p1.bigHandAngle = p1.bigHandRaw; // Pointer vers le haut
+      if (p2.turnTimer >= TURN_DURATION_P2) {
+        p2.turnTimer -= TURN_DURATION_P2;
+        chargeLevel = Math.min(10, chargeLevel + CHARGE_PER_TURN_P2); updateChargeUI();
+        if (chargeLevel >= 10) activateFireMode();
+        sfx.clockTick(); addSh(3, 150);
+        const gi = irng(0, GAME_SPEED_MODS.length - 1), pi = irng(0, PLAYER_SPEED_MODS.length - 1);
+        gameSpeedMod = GAME_SPEED_MODS[gi]; playerSpeedMod = PLAYER_SPEED_MODS[pi]; pl.MD = Math.round(88 / playerSpeedMod);
+        updateSpeedUI(GAME_MOD_LABELS[gi], PLAYER_MOD_LABELS[pi]);
+      }
+      if (fireMode) { fireModeTimer += dt; if (fireModeTimer >= FIRE_MODE_DURATION) deactivateFireMode(); }
+
+      // ==========================================
+      // CORRECTION DU COMPORTEMENT DE L'OMBRE
+      // ==========================================
+      const DELAI_OMBRE = 200; // <-- C'est LA variable. 200 = 0.2 seconde de retard.
+
+      p2Shadow.posHistory.push({ gx: pl.gx, gy: pl.gy, t: bT });
+
+      // On détruit tout l'historique qui est plus vieux que notre délai
+      p2Shadow.posHistory = p2Shadow.posHistory.filter(h => bT - h.t <= DELAI_OMBRE);
+
+      // Le tout premier élément de la liste restante a donc EXACTEMENT le bon retard !
+      const st2 = p2Shadow.posHistory[0];
+
+      if (st2 && st2.gx >= 0 && st2.gy >= 0) {
+        p2Shadow.gx = st2.gx; p2Shadow.gy = st2.gy;
+        p2Shadow.px = cellX(st2.gx); p2Shadow.py = cellY(st2.gy);
+      }
+
+      updateLasers(dt); updateSaw(dt, false); pl.update(dt);
+    }
+
+    function checkP2BossKill() {
+      if (bossHP <= 0 && bossState === BST.P2) {
+        bossState = BST.DYING; sfx.explode();
+        burst(bossX, bossY, K.gold, 60, 8, 900); burst(bossX, bossY, K.red, 40, 6, 800);
+        ring(bossX, bossY, K.gold, clockR * 3); addSh(20, 600); fScr(K.gold, 400); triggerGlitch(500);
+        startDialogue([
+          { name: 'SYSTÈME', color: K.red, text: 'ALERTE : CHRONOS EN SURCHARGE CRITIQUE ! STRUCTURE TEMPORELLE INSTABLE !' },
+          { name: 'CHRONOS', color: K.red, text: "Impossible… ma matrice se désintègre… MAIS TU MOURRAS AVEC MOI !" },
+          { name: 'SYSTÈME', color: K.gold, text: "15 SECONDES AVANT L'IMPLOSION TOTALE. ATTEIGNEZ UN TERMINAL POUR SURVIVRE !" }
+        ], startP3);
+      }
+    }
+
+    // ═══ PHASE 3
+    let p3 = { timeLeft: 15000, choiceMade: false };
+    function startP3() {
+      bossState = BST.P3; buildGrid('cross'); pl.reset(spawnP3.x, spawnP3.y); pl.inv = 1000; pl.MD = 88; gameSpeedMod = 1;
+      lasers = []; traps = []; sawPath = []; p3 = { timeLeft: 15000, choiceMade: false };
+      bossNmEl.style.color = K.red; bossNmEl.style.textShadow = `0 0 18px ${K.red}`;
+      bossPhEl.textContent = 'PHASE 3 — FUYEZ !'; bossPhEl.style.color = 'rgba(255,0,60,0.7)';
+      p3TimerEl.style.display = 'block'; chargeHUD.style.opacity = '0'; speedHUD.style.opacity = '0';
+      fireOverlay.style.opacity = '0'; fireLabelEl.style.display = 'none';
+    }
+    function updateP3(dt) {
+      if (p3.choiceMade) return;
+      p3.timeLeft -= dt; p3TimerEl.textContent = Math.max(0, Math.ceil(p3.timeLeft / 1000));
+      const urgency = 1 - Math.max(0, p3.timeLeft / 15000);
+      p3TimerEl.style.textShadow = `0 0 ${40 + urgency * 60}px #FF003C`;
+      if (p3.timeLeft < 5000) addSh(urgency * 3, 100);
+      for (const [key, term] of Object.entries(TERMINALS)) { if (pl.gx === term.gx && pl.gy === term.gy) { onTerminalChosen(key); return; } }
+      let nearTerm = null;
+      for (const [, term] of Object.entries(TERMINALS)) { if (Math.abs(pl.gx - term.gx) + Math.abs(pl.gy - term.gy) <= 1) { nearTerm = term; break; } }
+      if (nearTerm) { p3PromptEl.style.display = 'block'; p3PromptText.textContent = nearTerm.label; p3PromptText.style.color = nearTerm.color; p3PromptText.style.borderColor = nearTerm.color; p3PromptText.style.boxShadow = `0 0 15px ${nearTerm.color}66`; }
+      else { p3PromptEl.style.display = 'none'; }
+      if (p3.timeLeft <= 0) { p3.choiceMade = true; p3TimerEl.style.display = 'none'; p3PromptEl.style.display = 'none'; sfx.explode(); burst(W / 2, H / 2, K.red, 100, 10, 1200); addSh(30, 800); fScr(K.red, 500); triggerGlitch(800); setTimeout(() => { document.getElementById('death-menu').classList.add('show'); st = ST.DEAD; }, 2000); return; }
+      pl.update(dt);
+    }
+
+    function onTerminalChosen(key) {
+      if (p3.choiceMade) return;
+      unlockAchievement('ACH_BOSS_40');
+      p3.choiceMade = true;
+      p3TimerEl.style.display = 'none';
+      p3PromptEl.style.display = 'none';
+      bossState = BST.END;
+      sfx.terminal(); addSh(8, 300);
+      const term = TERMINALS[key];
+      fScr(term.color, 300);
+      burst(cellX(term.gx), cellY(term.gy), term.color, 40, 7, 700);
+      ring(cellX(term.gx), cellY(term.gy), term.color, TSZ * 2);
+      ono(term.label, W / 2 - 80, H / 2, term.color);
+
+      const ret = { level: 41, score, lives, col, maxLives };
+
+      if (key === 'left') {
+        localStorage.setItem('rvb2_b40_state', 'FORMATÉ');
+        // ── FORMATER ── +40 000 pts
+        gameStats.addFormater();
+        unlockAchievement('ACH_FIRST_BLOOD');
+        localStorage.setItem('rvb2_b40_dead', 'true'); // <-- AJOUTÉ : Le temps est cassé
+        ret.score += 40000; score += 40000;
+        ono('+40 000 PTS', W / 2, H / 2 + 50, K.red);
+
+      } else if (key === 'right') {
+        localStorage.setItem('rvb2_b40_state', 'ÉPARGNÉ');
+        // ── ÉPARGNER ── indice "_ _ _ K"
+        gameStats.addEpargner();
+        localStorage.setItem('rvb2_b40_dead', 'false'); // <-- AJOUTÉ : Le temps reste stable
+        setTimeout(() => {
+          ono('CHRONOS : "_ _ _ K et comme on dit parfois les apparences sont trompeuses"', W / 2 - 140, H / 2 + 50, K.green);
+        }, 400);
+
+      } else if (key === 'up') {
+        // ── FUSIONNER ── ralenti temporel [X]
+        localStorage.setItem('rvb2_b40_state', 'FUSIONNÉ');
+        gameStats.addCorruption();
+        gameStats.unlockSlowmo();
+        localStorage.setItem('rvb2_b40_dead', 'true'); // <-- AJOUTÉ : Le temps est cassé (absorbé)
+        ono('◈ POUVOIR ACQUIS : RALENTI [X] ◈', W / 2 - 140, H / 2 + 50, K.gold);
+      }
+
+      localStorage.setItem('rvb2_bossReturn', JSON.stringify(ret));
+      setTimeout(() => {
+        let fl = 0;
+        const fi = setInterval(() => {
+          addSh(15, 200); fScr(K.gold, 100); fl++;
+          burst(rng(W * .2, W * .8), rng(H * .2, H * .8), K.gold, 15, 5, 400);
+          if (fl >= 5) {
+            clearInterval(fi);
+            pageFlip('PALIER 41', 'CHRONOS VAINCU…', () => { window.location.href = 'ReveB2_Overclock.html'; });
+          }
+        }, 280);
+      }, 1200);
+    }
+
+
+    // ═══ UI
+    function updateChargeUI() { for (let i = 0; i < 10; i++) { const s = document.getElementById('cs' + i); if (s) { i < chargeLevel ? s.classList.add('filled') : s.classList.remove('filled'); } } }
+    function updateSpeedUI(gL, pL) { gL = gL || '×1'; pL = pL || '×1'; speedValEl.textContent = `VITESSE JEU: ${gL} | JOUEUR: ${pL}`; }
+    function updateBossHP() { bossBarEl.style.width = Math.max(0, bossHP / BOSS_MAX_HP * 100) + '%'; }
+
+    function updateSlowmoHUD() {
+      const el = document.getElementById('slowmo-hud');
+      if (!el) return;
+      if (typeof gameStats === 'undefined' || !gameStats.hasSlowmo) { el.style.opacity = '0'; return; }
+      el.style.opacity = '1';
+      if (pl.slowmoActive) el.textContent = `[X] RALENTI ${Math.ceil(pl.slowmoT / 1000)}s`;
+      else if (pl.slowmoCD > 0) el.textContent = `[X] RECHARGE ${Math.ceil(pl.slowmoCD / 1000)}s`;
+      else el.textContent = '[X] RALENTI PRÊT';
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: BACKGROUND
+    // ═══════════════════════════════════════════════════
+    function drawBackground(t) {
+      const grad = cx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * .7);
+      if (bossState === BST.P2 || bossState === BST.DYING) { grad.addColorStop(0, '#0a0015'); grad.addColorStop(1, '#020005'); }
+      else if (bossState === BST.P3 || bossState === BST.END) { grad.addColorStop(0, '#180000'); grad.addColorStop(1, '#030000'); }
+      else { grad.addColorStop(0, '#020015'); grad.addColorStop(1, '#020005'); }
+      cx.fillStyle = grad; cx.fillRect(0, 0, W, H);
+      const gridCol = bossState === BST.P2 ? K.pink : (bossState === BST.P3 ? K.red : K.blue);
+      const rotS = (bossState === BST.P2 ? -1 : 1) * gameSpeedMod;
+      cx.save(); cx.translate(W / 2, H / 2); cx.rotate(t * 0.06 * rotS); cx.globalAlpha = 0.04; glow(gridCol, 4); cx.strokeStyle = gridCol; cx.lineWidth = 1;
+      for (let r = 60; r <= Math.max(W, H) * .8; r += 120) { cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI * 2); cx.stroke(); }
+      for (let i = 0; i < 12; i++) { cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(Math.cos(i * Math.PI / 6) * Math.max(W, H), Math.sin(i * Math.PI / 6) * Math.max(W, H)); cx.stroke(); }
+      cx.restore(); cx.globalAlpha = 1; noGlow();
+      // Time-sand particles
+      const tCol = bossState === BST.P2 ? K.pink : (bossState === BST.P3 ? K.red : K.gold);
+      if (Math.random() < 0.5) timeSand.push({ x: rng(0, W), y: bossState === BST.P2 ? H + 30 : -30, vy: (bossState === BST.P2 ? -1 : 1) * rng(2, 6) * gameSpeedMod, size: rng(.8, 2.5), c: tCol });
+      cx.globalCompositeOperation = 'screen';
+      for (let i = timeSand.length - 1; i >= 0; i--) { const p = timeSand[i]; p.y += p.vy; glow(p.c, 10); cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, p.size, 0, Math.PI * 2); cx.fill(); if (p.y < -40 || p.y > H + 40) timeSand.splice(i, 1); }
+      cx.globalCompositeOperation = 'source-over'; noGlow();
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: 2D ARENA
+    // ═══════════════════════════════════════════════════
+    // ═══════════════════════════════════════════════════
+    // DRAW: 2D ARENA
+    // ═══════════════════════════════════════════════════
+    function drawArena(t, phase) {
+      const tileCol = phase === 2 ? K.pink : (phase === 3 ? K.red : K.blue);
+
+      // Fill arena background (un peu moins sombre pour faire ressortir les cases)
+      cx.fillStyle = '#020015'; cx.fillRect(arenaX - 1, arenaY - 1, arenaW + 2, arenaH + 2);
+
+      // Draw cells
+      for (let gy = 0; gy < GROWS; gy++) {
+        for (let gx = 0; gx < GCOLS; gx++) {
+          if (grid[gy]?.[gx] === T.HOLE) continue;
+
+          const tx = arenaX + gx * tileW, ty = arenaY + gy * tileH;
+          const aLaser = lasers.some(l => l.active && l.gy === gy);
+          const cLaser = lasers.some(l => l.charge > 0 && l.gy === gy);
+          const sawTile = sawPath.length > 0 ? getSawTile(sawProgress) : null;
+          const isSaw = sawTile && sawTile.gx === gx && sawTile.gy === gy;
+          const isPortal = grid[gy]?.[gx] === T.PORTAL;
+
+          // Cell fill : Couleurs plus vives et claires
+          let fillC = phase === 2 ? '#1a0025' : (phase === 3 ? '#220005' : '#051025');
+          if (aLaser) fillC = phase === 2 ? '#300040' : '#003050';
+          else if (cLaser) fillC = phase === 2 ? '#220030' : '#002035';
+          cx.fillStyle = fillC; cx.fillRect(tx + 1, ty + 1, tileW - 2, tileH - 2);
+
+          // Cell border : Bordures plus épaisses et lumineuses
+          let baseBorder = phase === 2 ? 'rgba(255,16,240,0.35)' : (phase === 3 ? 'rgba(255,0,60,0.35)' : 'rgba(0,245,255,0.35)');
+          glow(aLaser ? tileCol : (isSaw ? K.gold : 'transparent'), aLaser ? 15 : (isSaw ? 20 : 0));
+          cx.strokeStyle = aLaser ? tileCol : (isSaw ? K.gold : baseBorder);
+          cx.lineWidth = aLaser ? 2.5 : (isSaw ? 3 : 1.5);
+          cx.strokeRect(tx + 1, ty + 1, tileW - 2, tileH - 2);
+          noGlow();
+
+          // Petit reflet interne (inner highlight) pour donner du volume aux cases
+          if (!aLaser && !isSaw && !isPortal) {
+            cx.strokeStyle = phase === 2 ? 'rgba(255,16,240,0.1)' : (phase === 3 ? 'rgba(255,0,60,0.1)' : 'rgba(0,245,255,0.1)');
+            cx.lineWidth = 1;
+            cx.strokeRect(tx + 4, ty + 4, tileW - 8, tileH - 8);
+          }
+
+          // Laser row glow overlay (un peu plus prononcé)
+          if (aLaser) { cx.globalAlpha = .15 + Math.sin(t * 22) * .05; cx.fillStyle = tileCol; cx.fillRect(tx + 1, ty + 1, tileW - 2, tileH - 2); cx.globalAlpha = 1; }
+
+          // Portal terminal
+          if (isPortal) {
+            let termCol = K.blue;
+            for (const [, term] of Object.entries(TERMINALS)) { if (term.gx === gx && term.gy === gy) { termCol = term.color; break; } }
+            const pulse = .5 + Math.sin(t * 6) * .3;
+            cx.globalAlpha = pulse; glow(termCol, 18); cx.strokeStyle = termCol; cx.lineWidth = 2.5; cx.strokeRect(tx + 2, ty + 2, tileW - 4, tileH - 4);
+            cx.fillStyle = termCol; cx.font = `bold ${Math.min(tileH * .45, 20)}px Orbitron`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('★', tx + tileW / 2, ty + tileH / 2);
+            // Label text
+            for (const [, term] of Object.entries(TERMINALS)) {
+              if (term.gx === gx && term.gy === gy) {
+                cx.font = `bold ${Math.min(tileW * .1, 9)}px Share Tech Mono`; cx.fillText(term.label, tx + tileW / 2, ty + tileH / 2 + tileH * .28);
+                break;
+              }
+            }
+            cx.globalAlpha = 1; noGlow();
+          }
+        }
+      }
+
+      // Arena outer border (Bordure globale plus éclatante)
+      glow(tileCol, 15); cx.strokeStyle = tileCol; cx.lineWidth = 3; cx.strokeRect(arenaX, arenaY, arenaW, arenaH); noGlow();
+
+      // Grid lines (Lignes de séparation intérieures mieux définies)
+      cx.strokeStyle = phase === 2 ? 'rgba(255,16,240,0.2)' : 'rgba(0,245,255,0.2)';
+      if (phase === 3) cx.strokeStyle = 'rgba(255,0,60,0.2)';
+      cx.lineWidth = 1;
+      for (let gx = 1; gx < GCOLS; gx++) { cx.beginPath(); cx.moveTo(arenaX + gx * tileW, arenaY); cx.lineTo(arenaX + gx * tileW, arenaY + arenaH); cx.stroke(); }
+      for (let gy = 1; gy < GROWS; gy++) { cx.beginPath(); cx.moveTo(arenaX, arenaY + gy * tileH); cx.lineTo(arenaX + arenaW, arenaY + gy * tileH); cx.stroke(); }
+
+      // Speed indicator (small bar above arena center)
+      if (bossState === BST.P1 || bossState === BST.P2) {
+        const gi = GAME_SPEED_MODS.indexOf(gameSpeedMod);
+        const label = gi >= 0 ? GAME_MOD_LABELS[gi] : '×?';
+        const col2 = bossState === BST.P2 ? K.pink : K.blue;
+        const sx = W / 2, sy = arenaY - 16;
+        glow(col2, 8); cx.fillStyle = 'rgba(1,0,14,.9)'; cx.strokeStyle = col2; cx.lineWidth = 1; cx.fillRect(sx - 62, sy - 12, 124, 20); cx.strokeRect(sx - 62, sy - 12, 124, 20);
+        cx.fillStyle = col2; cx.font = 'bold 10px Orbitron'; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText(`JEU ${label}`, sx, sy); noGlow();
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: LASER COILS (4 per side, one per row)
+    // ═══════════════════════════════════════════════════
+    function drawCoils(t) {
+      if (lasers.length === 0) return;
+      const laserCol = bossState === BST.P2 ? K.pink : K.blue;
+      const coilW = Math.min(tileH * .8, 44), coilH = Math.min(tileH * .7, 38);
+      const nozzleLen = coilH * .45, gap = 8;
+
+      // Position approximative des mains du boss pour les flux d'énergie
+      const bossHandY = bossY + 90 * BSCL + Math.sin(t * 2) * 15 * BSCL;
+      const bossLeftHandX = bossX - 95 * BSCL;
+      const bossRightHandX = bossX + 95 * BSCL;
+
+      for (let gy = 0; gy < GROWS; gy++) {
+        const rCY = arenaY + gy * tileH + tileH / 2;
+        for (const side of ['L', 'R']) {
+          const lsr = lasers.find(l => l.side === side && l.gy === gy);
+          const isActive = lsr && lsr.active;
+          const isCharging = lsr && lsr.charge > 0;
+          const chR = lsr ? lsr.charge / lsr.chargeMax : 0;
+          const col = isActive ? laserCol : (isCharging ? laserCol : '#182838');
+          const glAmt = isActive ? 20 : (isCharging ? 4 + chR * 12 : 3);
+          const dir = side === 'L' ? 1 : -1;
+          const baseCX = side === 'L' ? arenaX - gap - coilW / 2 : arenaX + arenaW + gap + coilW / 2;
+
+          // NOUVEAU: Liens temporels connectés aux mains du boss
+          if (isActive || isCharging) {
+            const hX = side === 'L' ? bossLeftHandX : bossRightHandX;
+            const lineAlpha = isActive ? 0.6 : 0.6 * chR;
+            cx.save();
+            cx.globalCompositeOperation = 'screen';
+            cx.beginPath();
+            cx.moveTo(hX, bossHandY);
+            cx.quadraticCurveTo(hX, rCY, baseCX, rCY); // Courbe d'énergie
+            cx.strokeStyle = laserCol;
+            cx.lineWidth = isActive ? 3 + Math.sin(t * 20) * 2 : 1 + chR * 2;
+            glow(laserCol, 10);
+            cx.globalAlpha = lineAlpha + (Math.random() * 0.2);
+            cx.stroke();
+
+            cx.setLineDash([10, 20]);
+            cx.lineDashOffset = -t * 50 * (isActive ? 2 : 1);
+            cx.strokeStyle = '#fff';
+            cx.lineWidth = isActive ? 2 : 1;
+            cx.stroke();
+            cx.restore();
+          }
+
+          cx.save(); cx.translate(baseCX, rCY);
+          glow(col, glAmt);
+          cx.fillStyle = '#010018'; cx.strokeStyle = col; cx.lineWidth = 1.5;
+          cx.fillRect(-coilW / 2, -coilH / 2, coilW, coilH); cx.strokeRect(-coilW / 2, -coilH / 2, coilW, coilH);
+          cx.strokeStyle = col; cx.lineWidth = 1.2;
+          for (let w = 0; w < 5; w++) {
+            const wy = -coilH / 2 + coilH * (w + .5) / 5;
+            cx.beginPath(); cx.ellipse(0, wy, coilW * .36, coilH / 13, 0, 0, Math.PI * 2); cx.stroke();
+          }
+          cx.fillStyle = col; cx.beginPath(); cx.arc(0, 0, 3, 0, Math.PI * 2); cx.fill();
+          const nH = coilH * .26;
+          cx.fillStyle = col; cx.fillRect(dir * coilW / 2, -(nH / 2), dir * nozzleLen, nH);
+          const tipX = dir * (coilW / 2 + nozzleLen);
+          if (isActive || isCharging) {
+            const ballR = (coilH * .18) * (isActive ? 1 : .35 + chR * .65);
+            const alpha = isActive ? .85 + Math.sin(t * 25) * .15 : chR * .8;
+            cx.globalAlpha = alpha; glow(laserCol, 16); cx.fillStyle = laserCol;
+            cx.beginPath(); cx.arc(tipX, 0, ballR, 0, Math.PI * 2); cx.fill();
+            cx.globalAlpha = 1;
+          }
+          if (isCharging && !isActive) {
+            for (let r = 1; r <= 3; r++) {
+              cx.globalAlpha = chR * (0.38 - r * .09); glow(laserCol, 6);
+              cx.strokeStyle = laserCol; cx.lineWidth = 1;
+              cx.beginPath(); cx.arc(tipX, 0, coilH * .14 * r * chR, 0, Math.PI * 2); cx.stroke();
+            }
+            cx.globalAlpha = 1;
+          }
+          noGlow(); cx.restore();
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: LASER BEAMS
+    // ═══════════════════════════════════════════════════
+    function drawLasers(t) {
+      const laserCol = bossState === BST.P2 ? K.pink : K.blue;
+      for (const lsr of lasers) {
+        if (!lsr.active) continue;
+        const rCY = arenaY + lsr.gy * tileH + tileH / 2;
+        const x0 = arenaX, x1 = arenaX + arenaW;
+        const alpha = .75 + Math.sin(t * 32) * .2;
+
+        cx.save();
+        cx.globalCompositeOperation = 'screen';
+        cx.globalAlpha = alpha;
+        glow(laserCol, 30);
+
+        // Cœur du laser ultra-lumineux
+        cx.strokeStyle = '#fff';
+        cx.lineWidth = Math.min(tileH * .15, 8);
+        cx.beginPath(); cx.moveTo(x0, rCY); cx.lineTo(x1, rCY); cx.stroke();
+
+        // Halo temporel principal
+        cx.strokeStyle = laserCol;
+        cx.lineWidth = Math.min(tileH * .4, 26);
+        cx.beginPath(); cx.moveTo(x0, rCY); cx.lineTo(x1, rCY); cx.stroke();
+
+        // Lignes sinusoïdales (Distorsion temporelle 1)
+        cx.lineWidth = 2;
+        cx.beginPath();
+        for (let x = x0; x <= x1; x += 10) {
+          const yOff = Math.sin(x * 0.05 - t * 20) * 12;
+          x === x0 ? cx.moveTo(x, rCY + yOff) : cx.lineTo(x, rCY + yOff);
+        }
+        cx.stroke();
+
+        // Lignes sinusoïdales inversées (Distorsion temporelle 2)
+        cx.strokeStyle = bossState === BST.P2 ? K.gold : K.green;
+        cx.beginPath();
+        for (let x = x0; x <= x1; x += 10) {
+          const yOff = Math.cos(x * 0.07 + t * 25) * 15;
+          x === x0 ? cx.moveTo(x, rCY + yOff) : cx.lineTo(x, rCY + yOff);
+        }
+        cx.stroke();
+
+        // Rayons horizontaux erratiques
+        cx.strokeStyle = laserCol;
+        cx.lineWidth = 1;
+        for (let i = 0; i < 4; i++) {
+          const off = Math.sin(t * 14 + i * 1.5) * tileH * .35;
+          cx.beginPath(); cx.moveTo(x0, rCY + off); cx.lineTo(x1, rCY + off); cx.stroke();
+        }
+
+        cx.restore();
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: SAW (2D)
+    // ═══════════════════════════════════════════════════
+    function drawSaw(t, clockwise) {
+      if (sawPath.length === 0) return;
+
+      // NOUVEAU: Tracer la ligne de trajectoire ("rail") de la scie
+      cx.save();
+      cx.strokeStyle = bossState === BST.P2 ? 'rgba(255, 16, 240, 0.15)' : 'rgba(255, 215, 0, 0.15)';
+      cx.lineWidth = 4;
+      cx.setLineDash([10, 10]); // Ligne pointillée
+      cx.lineDashOffset = -t * 20 * (clockwise ? 1 : -1); // Défilement dynamique
+      cx.beginPath();
+      for (let i = 0; i < sawPath.length; i++) {
+        const sx = cellX(sawPath[i].gx), sy = cellY(sawPath[i].gy);
+        if (i === 0) cx.moveTo(sx, sy);
+        else cx.lineTo(sx, sy);
+      }
+      cx.closePath(); // Ferme le circuit complet
+      cx.stroke();
+      cx.restore();
+
+      const tile = getSawTile(sawProgress); if (!tile) return;
+      const sx = cellX(tile.gx), sy = cellY(tile.gy);
+      const r = Math.min(tileW, tileH) * .42;
+      const col2 = bossState === BST.P2 ? K.pink : K.gold;
+      const spinT = t * 8 * (clockwise ? 1 : -1) * gameSpeedMod;
+      cx.save(); cx.translate(sx, sy); glow(col2, 22);
+      cx.strokeStyle = col2; cx.lineWidth = 2; cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI * 2); cx.stroke();
+      cx.fillStyle = col2;
+      for (let i = 0; i < 12; i++) { const a = spinT + (i / 12) * Math.PI * 2; cx.save(); cx.rotate(a); cx.beginPath(); cx.moveTo(r, 0); cx.lineTo(r * 1.3, -r * .15); cx.lineTo(r * 1.3, r * .15); cx.closePath(); cx.fill(); cx.restore(); }
+      cx.globalAlpha = .4; cx.fillStyle = col2; cx.beginPath(); cx.arc(0, 0, r * .44, 0, Math.PI * 2); cx.fill(); cx.globalAlpha = 1;
+      noGlow(); cx.fillStyle = '#020005'; cx.beginPath(); cx.arc(0, 0, r * .2, 0, Math.PI * 2); cx.fill();
+      glow(col2, 30); cx.fillStyle = col2; cx.beginPath(); cx.arc(0, 0, r * .1, 0, Math.PI * 2); cx.fill();
+      cx.globalCompositeOperation = 'screen'; cx.globalAlpha = .55; cx.strokeStyle = col2; cx.lineWidth = 3;
+      for (let i = 0; i < 3; i++) { const a = spinT + i * Math.PI * .66; cx.beginPath(); cx.arc(0, 0, r * .82, a - .5, a); cx.stroke(); }
+      cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = 1; noGlow();
+      if (bossState === BST.P2) { for (let g = 0; g < 3; g++) { const off = (g + 1) * 3.5; const gP = ((sawProgress - off) % sawPath.length + sawPath.length) % sawPath.length; const gt = getSawTile(gP); if (!gt) continue; cx.save(); cx.translate(cellX(gt.gx), cellY(gt.gy)); cx.globalAlpha = .2 - g * .05; glow(K.pink, 8); cx.strokeStyle = K.pink; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI * 2); cx.stroke(); cx.globalAlpha = 1; noGlow(); cx.restore(); } }
+      cx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: SHADOW P2
+    // ═══════════════════════════════════════════════════
+    function drawShadow(t) {
+      if (bossState !== BST.P2) return;
+      if (p2Shadow.gx < 0 || p2Shadow.gy < 0 || p2Shadow.gx >= GCOLS || p2Shadow.gy >= GROWS) return;
+      const sx = cellX(p2Shadow.gx), sy = cellY(p2Shadow.gy);
+      const pa = .5 + Math.sin(t * 8) * .2;
+
+      cx.save();
+      cx.translate(sx, sy);
+      cx.globalAlpha = pa;
+      cx.globalCompositeOperation = 'screen';
+
+      const s = TSZ * 0.32;
+      const t2 = Date.now() / 250;
+
+      glow(K.pink, 20);
+      cx.strokeStyle = K.pink;
+      cx.lineWidth = 2;
+      cx.save();
+      cx.rotate(Math.PI / 4 + t2 * 0.1);
+      cx.strokeRect(-s * 0.8, -s * 0.8, s * 1.6, s * 1.6);
+      cx.restore();
+
+      cx.save();
+      cx.rotate(Math.PI / 4);
+      cx.fillStyle = K.pink;
+      cx.fillRect(-s / 2, -s / 2, s, s);
+      cx.fillStyle = '#fff';
+      cx.fillRect(-s * 0.18, -s * 0.18, s * 0.36, s * 0.36);
+      cx.restore();
+
+      cx.globalCompositeOperation = 'source-over';
+      cx.globalAlpha = 1;
+      noGlow();
+      cx.restore();
+
+      cx.save();
+      cx.globalAlpha = pa * .9;
+      glow(K.pink, 8);
+      cx.fillStyle = K.pink;
+      cx.font = 'bold 9px Share Tech Mono';
+      cx.textAlign = 'center';
+      cx.textBaseline = 'bottom';
+      cx.fillText('OMBRE -0.2s', sx, sy - tileH * .45);
+      cx.globalAlpha = 1;
+      noGlow();
+      cx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: BOSS PHASE 1 — LE SAGE (from style40.html)
+    // ═══════════════════════════════════════════════════
+    function drawBossP1(t) {
+      const mainCol = '#00F5FF', secCol = '#FFD700', speedT = t * gameSpeedMod;
+      const breathe = Math.sin(t * 2) * 15 * BSCL;
+      cx.save(); cx.translate(bossX, bossY + breathe); cx.scale(BSCL * 1.2, BSCL * 1.2);
+
+      cx.save(); cx.translate(0, -60);
+      cx.save(); cx.rotate(speedT * .2); glow(secCol, 20); cx.strokeStyle = secCol; cx.lineWidth = 2;
+      cx.beginPath(); cx.arc(0, 0, 180, 0, Math.PI * 2); cx.stroke();
+      cx.fillStyle = secCol; for (let i = 0; i < 16; i++) { cx.rotate(Math.PI / 8); cx.fillRect(170, -2, 20, 4); } cx.restore();
+      cx.save(); cx.rotate(-speedT * .4); glow(mainCol, 15); cx.strokeStyle = mainCol; cx.lineWidth = 6; cx.setLineDash([20, 30]);
+      cx.beginPath(); cx.arc(0, 0, 140, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); cx.restore(); cx.restore();
+
+      noGlow(); cx.fillStyle = '#05020a'; cx.strokeStyle = mainCol; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(-90, -80); cx.lineTo(90, -80); cx.lineTo(120, -30); cx.lineTo(60, -20); cx.lineTo(0, -50); cx.lineTo(-60, -20); cx.lineTo(-120, -30); cx.closePath(); cx.fill(); cx.stroke();
+      const drapeSway = Math.sin(t * 3) * 10;
+      cx.beginPath(); cx.moveTo(-60, 40); cx.lineTo(60, 40); cx.lineTo(80 + drapeSway, 180); cx.lineTo(0, 220); cx.lineTo(-80 + drapeSway, 180); cx.closePath(); cx.fill(); cx.stroke();
+
+      const drawArm = (isLeft) => {
+        const side = isLeft ? -1 : 1; cx.save(); cx.translate(side * 80, -60);
+        const swing = Math.sin(t * 2 + (isLeft ? 0 : Math.PI)) * .1; cx.rotate(side * -.4 + swing);
+        glow(mainCol, 10); cx.strokeStyle = '#111'; cx.lineWidth = 14; cx.lineCap = 'round'; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 70); cx.stroke();
+        cx.translate(0, 70); glow(secCol, 15); cx.fillStyle = secCol; cx.beginPath(); cx.arc(0, 0, 10, 0, Math.PI * 2); cx.fill(); noGlow();
+        cx.rotate(side * .8); cx.strokeStyle = '#111'; cx.lineWidth = 10; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 60); cx.stroke();
+        cx.translate(0, 70); glow(mainCol, 30); cx.fillStyle = mainCol;
+        cx.beginPath(); cx.arc(0, 0, 8 + Math.sin(t * 10) * 3, 0, Math.PI * 2); cx.fill();
+        cx.rotate(speedT); cx.strokeStyle = mainCol; cx.lineWidth = 2; cx.beginPath(); cx.arc(0, 0, 25, 0, Math.PI * 2); cx.stroke();
+        cx.fillStyle = secCol; for (let i = 0; i < 4; i++) { cx.rotate(Math.PI / 2); cx.fillRect(20, -1, 10, 2); } cx.restore();
+      };
+      drawArm(true); drawArm(false);
+
+      cx.save(); cx.translate(0, -10);
+      glow(mainCol, 20); cx.fillStyle = '#020005'; cx.strokeStyle = mainCol; cx.lineWidth = 4;
+      cx.beginPath(); cx.arc(0, 0, 60, 0, Math.PI * 2); cx.fill(); cx.stroke();
+      glow(secCol, 30); cx.fillStyle = 'rgba(255,215,0,0.15)'; cx.beginPath(); cx.arc(0, 0, 45, 0, Math.PI * 2); cx.fill();
+      noGlow(); cx.fillStyle = secCol;
+      for (let i = 0; i < 12; i++) { cx.save(); cx.rotate(i * Math.PI / 6); cx.fillRect(-2, -55, 4, 10); cx.restore(); }
+
+      cx.save(); cx.rotate(p1.bigHandAngle);
+      glow(mainCol, 15); cx.fillStyle = '#fff'; cx.strokeStyle = mainCol; cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(-4, 10); cx.lineTo(4, 10); cx.lineTo(0, -75); cx.closePath(); cx.fill(); cx.stroke(); cx.restore();
+
+      // Correction de l'aiguille de base
+      const smallAng = p1.smallHandRaw;
+      cx.save(); cx.rotate(smallAng);
+      glow(secCol, 15); cx.fillStyle = '#111'; cx.strokeStyle = secCol; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(-8, 15); cx.lineTo(8, 15); cx.lineTo(15, -10); cx.lineTo(0, -50); cx.lineTo(-15, -10); cx.closePath(); cx.fill(); cx.stroke();
+      cx.fillStyle = secCol; cx.beginPath(); cx.arc(0, -15, 5, 0, Math.PI * 2); cx.fill(); cx.restore();
+
+      if (fireMode) {
+        const cp = .5 + Math.sin(t * 16) * .5; glow(K.gold, 30 * cp); cx.strokeStyle = K.gold; cx.lineWidth = 2; cx.globalAlpha = cp;
+        cx.beginPath(); cx.moveTo(-38, 0); cx.lineTo(38, 0); cx.stroke(); cx.beginPath(); cx.moveTo(0, -38); cx.lineTo(0, 38); cx.stroke();
+        cx.globalAlpha = 1; noGlow();
+      }
+      glow('#fff', 20); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, 0, 8, 0, Math.PI * 2); cx.fill(); noGlow();
+      cx.restore();
+
+      cx.save(); cx.translate(0, -90);
+      noGlow(); cx.fillStyle = '#05020a'; cx.strokeStyle = secCol; cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(-30, 10); cx.lineTo(-45, -40); cx.lineTo(-15, -80); cx.lineTo(0, -90); cx.lineTo(15, -80); cx.lineTo(45, -40); cx.lineTo(30, 10); cx.closePath(); cx.fill(); cx.stroke();
+      cx.fillStyle = '#000'; cx.beginPath(); cx.moveTo(-25, -30); cx.lineTo(0, -60); cx.lineTo(25, -30); cx.lineTo(0, 10); cx.closePath(); cx.fill();
+      glow(mainCol, 25); cx.fillStyle = '#fff';
+      cx.beginPath(); cx.ellipse(0, -45, 3, 8, 0, 0, Math.PI * 2); cx.fill();
+      cx.beginPath(); cx.ellipse(-12, -30, 8, 2, 0, 0, Math.PI * 2); cx.fill();
+      cx.beginPath(); cx.ellipse(12, -30, 8, 2, 0, 0, Math.PI * 2); cx.fill();
+      cx.globalCompositeOperation = 'screen'; glow(secCol, 15); cx.strokeStyle = 'rgba(255,215,0,0.6)'; cx.lineWidth = 2;
+      for (let i = 0; i < 5; i++) { const bx = (i - 2) * 6; const bL = 30 + Math.cos(i) * 10; const bS = Math.sin(t * 2 + i) * 5; cx.beginPath(); cx.moveTo(bx, 0); cx.quadraticCurveTo(bx + bS, bL / 2, bx * 1.5 + bS, bL); cx.stroke(); }
+      cx.globalCompositeOperation = 'source-over'; noGlow();
+      cx.restore();
+      cx.restore();
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: BOSS PHASE 2 — LE PSYCHOPATHE (from style40)
+    // ═══════════════════════════════════════════════════
+    function drawBossP2(t) {
+      const mainCol = '#FF10F0', secCol = '#8A2BE2', revT = -t * gameSpeedMod * 1.5;
+      // Ghost echoes first
+      for (let i = 3; i >= 1; i--) {
+        const ghostT = revT - (i * .15);
+        const ghostX = Math.sin(ghostT * 5) * 40;
+        drawPsychoChronos(t, ghostX, ghostT, .28 - i * .06, true, mainCol, secCol);
+      }
+      // Real boss
+      drawPsychoChronos(t, Math.sin(revT * 5) * 40, revT, 1, false, mainCol, secCol);
+    }
+    function drawPsychoChronos(t, offX, localT, alpha, isGhost, mainCol, secCol) {
+      cx.save();
+      const twitchX = isGhost ? 0 : (Math.random() - .5) * 6, twitchY = isGhost ? 0 : (Math.random() - .5) * 6;
+      cx.translate(bossX + offX + twitchX, bossY + 20 * BSCL + twitchY); cx.scale(BSCL * 1.2, BSCL * 1.2); cx.globalAlpha = alpha;
+      // Halo
+      cx.save(); cx.translate(0, -40);
+      cx.save(); cx.rotate(localT * .4); glow(mainCol, 20); cx.strokeStyle = mainCol; cx.lineWidth = 4; cx.setLineDash([30, 20, 5, 20]); cx.beginPath(); cx.arc(0, 0, 180, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); cx.restore();
+      cx.save(); cx.rotate(-localT * .8); glow(secCol, 15); cx.strokeStyle = secCol; cx.lineWidth = 10; cx.setLineDash([10, 40]); cx.beginPath(); cx.arc(0, 0, 140, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); cx.restore(); cx.restore();
+      // Body
+      noGlow(); cx.fillStyle = isGhost ? 'transparent' : '#050005'; cx.strokeStyle = secCol; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(-80, -60); cx.lineTo(80, -60); cx.lineTo(100, -10); cx.lineTo(40, 0); cx.lineTo(0, -30); cx.lineTo(-40, 0); cx.lineTo(-100, -10); cx.closePath(); cx.fill(); cx.stroke();
+      const cS = Math.sin(localT * 10) * 15;
+      cx.beginPath(); cx.moveTo(-50, 40); cx.lineTo(50, 40); cx.lineTo(90 + cS, 120); cx.lineTo(40, 100); cx.lineTo(10 - cS, 190); cx.lineTo(-20, 110); cx.lineTo(-70 + cS, 160); cx.closePath(); cx.fill(); cx.stroke();
+      // Arms
+      const drawPA = (isLeft) => {
+        const side = isLeft ? -1 : 1; cx.save(); cx.translate(side * 70, -40);
+        const at = Math.sin(localT * (isLeft ? 8 : 12)) * .4; cx.rotate(side * -.8 + at);
+        glow(secCol, 10); cx.strokeStyle = '#111'; cx.lineWidth = 10; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(side * 20, 60); cx.stroke();
+        cx.translate(side * 20, 60); glow(mainCol, 15); cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 8, 0, Math.PI * 2); cx.fill(); noGlow();
+        cx.rotate(side * 1.5 + Math.sin(localT * 15) * .2); cx.strokeStyle = '#111'; cx.lineWidth = 8; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 70); cx.stroke();
+        cx.translate(0, 70); glow(mainCol, 20); cx.strokeStyle = mainCol; cx.lineWidth = 3;
+        cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-15, 30); cx.stroke(); cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 40); cx.stroke(); cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(15, 30); cx.stroke(); cx.restore();
+      };
+      drawPA(true); drawPA(false);
+      // Clock (distorted jagged)
+      cx.save(); cx.translate(0, -10); glow(secCol, 20); cx.fillStyle = isGhost ? 'transparent' : '#050005'; cx.strokeStyle = mainCol; cx.lineWidth = 4;
+      cx.beginPath(); for (let a = 0; a < Math.PI * 2; a += .5) { let r = 55 + Math.random() * 10; if (a === 0) cx.moveTo(Math.cos(a) * r, Math.sin(a) * r); else cx.lineTo(Math.cos(a) * r, Math.sin(a) * r); } cx.closePath(); cx.fill(); cx.stroke();
+      // Big hand spinning fast
+      cx.save(); cx.rotate(p1.bigHandAngle); glow(mainCol, 15); cx.fillStyle = mainCol; cx.beginPath(); cx.moveTo(-2, 10); cx.lineTo(2, 10); cx.lineTo(0, -65); cx.closePath(); cx.fill(); cx.restore();
+      // Small hand
+      cx.save(); cx.rotate(localT * 3.5 + Math.PI); glow(mainCol, 15); cx.fillStyle = '#fff'; cx.beginPath(); cx.moveTo(-4, 15); cx.lineTo(4, 15); cx.lineTo(0, -45); cx.closePath(); cx.fill(); cx.restore();
+      // Fire mode crosshair
+      if (fireMode) { const cp = .5 + Math.sin(t * 16) * .5; glow(K.gold, 25 * cp); cx.strokeStyle = K.gold; cx.lineWidth = 2; cx.globalAlpha = cp; cx.beginPath(); cx.moveTo(-35, 0); cx.lineTo(35, 0); cx.stroke(); cx.beginPath(); cx.moveTo(0, -35); cx.lineTo(0, 35); cx.stroke(); cx.globalAlpha = alpha; }
+      cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 6, 0, Math.PI * 2); cx.fill(); cx.restore();// end clock
+      // Head psycho
+      cx.save(); cx.translate(0, -70); cx.rotate(-Math.PI * .15 + Math.sin(localT * 8) * .1);
+      noGlow(); cx.fillStyle = isGhost ? 'transparent' : '#05000a'; cx.strokeStyle = mainCol; cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(-25, 10); cx.lineTo(-40, -20); cx.lineTo(-20, -70); cx.lineTo(10, -60); cx.lineTo(35, -30); cx.lineTo(20, 10); cx.closePath(); cx.fill(); cx.stroke();
+      cx.fillStyle = '#000'; cx.beginPath(); cx.moveTo(-20, -20); cx.lineTo(-5, -50); cx.lineTo(15, -25); cx.lineTo(0, 5); cx.closePath(); cx.fill();
+      // Single twitching eye
+      const eT = Math.sin(localT * 20) * 3;
+      glow(mainCol, 30); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(-5 + eT, -35, 12, 0, Math.PI * 2); cx.fill();
+      cx.fillStyle = '#000'; noGlow(); cx.beginPath(); cx.arc(-5 + eT, -35, 3, 0, Math.PI * 2); cx.fill();
+      // Zig-zag mouth
+      glow(mainCol, 15); cx.strokeStyle = mainCol; cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(-20, -10); cx.lineTo(-10, -5); cx.lineTo(-5, -15); cx.lineTo(5, -5); cx.lineTo(15, -15); cx.lineTo(20, -5); cx.stroke();
+      noGlow(); cx.restore(); cx.restore();// end psycho
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: BOSS PHASE 3 — LE DÉCHIREUR (from style40)
+    // ═══════════════════════════════════════════════════
+    function drawBossP3(t) {
+      const mainCol = '#FF003C';
+      let timeBreak = (Math.random() < .15) ? (Math.random() - .5) * 4 : 0;
+      let distT = t + Math.sin(t * 4) * 1.5 + timeBreak;
+      // Screen shake already applied via getSh. Add extra P3 trembling
+      cx.save(); cx.translate((Math.random() - .5) * 10, (Math.random() - .5) * 10);
+      // Halo (broken arc, spins fast)
+      cx.save(); cx.translate(bossX, bossY - 40 * BSCL); cx.rotate(distT * 1.5);
+      cx.scale(BSCL * 1.3, BSCL * 1.3);
+      glow(mainCol, 30); cx.strokeStyle = mainCol; cx.lineWidth = 5;
+      cx.beginPath(); cx.arc(0, 0, 180, 0, Math.PI * 1.3); cx.stroke(); cx.restore();
+      // Body
+      cx.save(); cx.translate(bossX, bossY); cx.scale(BSCL * 1.3, BSCL * 1.3);
+      noGlow(); cx.fillStyle = '#050002'; cx.strokeStyle = mainCol; cx.lineWidth = 3;
+      cx.beginPath(); cx.moveTo(-80, -60); cx.lineTo(80, -60); cx.lineTo(100, -10); cx.lineTo(40, 0); cx.lineTo(0, -30); cx.lineTo(-40, 0); cx.lineTo(-100, -10); cx.closePath(); cx.fill(); cx.stroke();
+      const pS = Math.sin(distT * 15) * 30;
+      cx.beginPath(); cx.moveTo(-50, 40); cx.lineTo(50, 40); cx.lineTo(90 + pS, 120); cx.lineTo(40, 100); cx.lineTo(10 - pS, 190); cx.lineTo(-20, 110); cx.lineTo(-70 + pS, 160); cx.closePath(); cx.fill(); cx.stroke();
+      // Arms (tearing motion)
+      const drawTA = (isLeft) => {
+        const side = isLeft ? -1 : 1; cx.save(); cx.translate(side * 70, -40);
+        const pm = Math.sin(distT * 5) * .5; cx.rotate(side * -1.2 + pm);
+        glow(mainCol, 15); cx.strokeStyle = '#111'; cx.lineWidth = 14; cx.lineCap = 'round';
+        cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -80); cx.stroke();
+        cx.translate(0, -80); glow(mainCol, 20); cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 12, 0, Math.PI * 2); cx.fill(); noGlow();
+        cx.rotate(side * .5 - pm * 1.5); cx.strokeStyle = '#111'; cx.lineWidth = 12; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -70); cx.stroke();
+        cx.translate(0, -70); glow(mainCol, 30); cx.strokeStyle = mainCol; cx.lineWidth = 5;
+        cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-25, -35); cx.stroke(); cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -45); cx.stroke(); cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(25, -35); cx.stroke(); cx.restore();
+      };
+      drawTA(true); drawTA(false);
+      // Glitching clock
+      cx.save(); cx.translate(0, -10); glow(mainCol, 40); cx.fillStyle = '#050002'; cx.strokeStyle = mainCol; cx.lineWidth = 5; cx.beginPath(); cx.arc(0, 0, 60, 0, Math.PI * 2); cx.fill(); cx.stroke();
+      const bTwitch = Math.sin(distT * 50) * .2;
+      cx.save(); cx.rotate(Math.PI * .8 + bTwitch); glow(mainCol, 20); cx.fillStyle = mainCol; cx.beginPath(); cx.moveTo(-4, 10); cx.lineTo(4, 10); cx.lineTo(0, -70); cx.closePath(); cx.fill(); cx.restore();
+      cx.save(); cx.rotate(-Math.PI * .3 - bTwitch * 1.5); cx.fillStyle = mainCol; cx.beginPath(); cx.moveTo(-3, 10); cx.lineTo(3, 10); cx.lineTo(0, -50); cx.closePath(); cx.fill(); cx.restore();
+      cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, 0, 8, 0, Math.PI * 2); cx.fill();
+      // Digital blood drip
+      cx.fillStyle = mainCol; cx.fillRect(-10, 20 + Math.random() * 5, 4, 60); cx.fillRect(5, 30 + Math.random() * 5, 3, 40); cx.restore();
+      // Head (screaming)
+      cx.save(); cx.translate(0, -70); cx.rotate(-Math.PI * .15 + Math.sin(distT * 8) * .1);
+      noGlow(); cx.fillStyle = '#050002'; cx.strokeStyle = mainCol; cx.lineWidth = 2;
+      cx.beginPath(); cx.moveTo(-25, 10); cx.lineTo(-40, -20); cx.lineTo(-10, -70); cx.lineTo(30, -60); cx.lineTo(40, -20); cx.lineTo(25, 10); cx.closePath(); cx.fill(); cx.stroke();
+      cx.fillStyle = '#000'; cx.beginPath(); cx.moveTo(-15, -15); cx.lineTo(-5, -50); cx.lineTo(20, -20); cx.lineTo(5, 10); cx.closePath(); cx.fill();
+      // Glitched eyes
+      glow(mainCol, 40); cx.fillStyle = '#fff';
+      cx.beginPath(); cx.ellipse(-5, -45, 6, 2, Math.PI / 4, 0, Math.PI * 2); cx.fill();
+      cx.beginPath(); cx.ellipse(15, -35, 8, 3, -Math.PI / 6, 0, Math.PI * 2); cx.fill();
+      noGlow(); cx.restore();
+      cx.restore(); cx.restore();// end P3 boss
+    }
+
+    // ═══════════════════════════════════════════════════
+    // DRAW: P3 DECORATIONS
+    // ═══════════════════════════════════════════════════
+    function drawP3Decorations(t) {
+      for (const [, term] of Object.entries(TERMINALS)) {
+        const sx = cellX(term.gx), sy = cellY(term.gy) - tileH * .6;
+        const pulse = .6 + Math.sin(t * 5) * .4;
+        cx.save(); cx.globalAlpha = pulse; glow(term.color, 18); cx.fillStyle = term.color;
+        cx.font = `bold ${Math.min(tileH * .55, 22)}px Orbitron`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('▲', sx, sy);
+        cx.font = `bold ${Math.min(tileW * .1, 10)}px Share Tech Mono`; cx.fillText(term.label, sx, sy + tileH * .55);
+        cx.globalAlpha = 1; noGlow(); cx.restore();
+      }
+      const urgency = 1 - Math.max(0, p3.timeLeft / 15000);
+      if (urgency > .4) {
+        cx.globalCompositeOperation = 'screen'; cx.strokeStyle = K.red; cx.lineWidth = 1; cx.globalAlpha = urgency * .3;
+        for (let i = 0; i < Math.floor(urgency * 8); i++) { cx.beginPath(); cx.moveTo(rng(0, W), rng(0, H)); cx.lineTo(rng(0, W), rng(0, H)); cx.stroke(); }
+        cx.globalCompositeOperation = 'source-over'; cx.globalAlpha = 1;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════
+    // MAIN UPDATE
+    // ═══════════════════════════════════════════════════
+    function update(ts) {
+      const rawDt = Math.min(ts - lastT, 50); lastT = ts;
+      // Ralenti temporel : halve dt when slowmoActive
+      const dt = (pl && pl.slowmoActive) ? rawDt * 0.5 : rawDt;
+      bT += rawDt; globalTime = ts;
+      for (const s of shakes) s.t += dt; shakes = shakes.filter(s => s.t < s.d);
+      for (const p of parts) { p.x += p.vx * (dt / 16); p.y += p.vy * (dt / 16); p.vy += p.g * (dt / 16); p.life = Math.max(0, p.life - dt); }
+      parts = parts.filter(p => p.life > 0);
+      _glitchT = Math.max(0, _glitchT - dt);
+      if (bossState === BST.END) return;
+      if (bossState === BST.TRANS || bossState === BST.DYING) { if (!isDialogActive) pl.update(dt); return; }
+      if (isDialogActive) { pl.update(dt * .1); return; }
+      if (bossState === BST.P1) updateP1(dt);
+      else if (bossState === BST.P2) { updateP2(dt); checkP2BossKill(); }
+      else if (bossState === BST.P3) updateP3(dt);
+      updateSlowmoHUD();
+    }
+
+    // ─── UI DU JOUEUR (CŒURS, SCORE, DASH) ───
+    function drawUI() {
+      // Cadre des cœurs
+      const heartW = 26;
+      const boxW = maxLives * heartW + 16;
+      const boxY = 8;
+
+      cx.fillStyle = 'rgba(0,0,0,.85)'; cx.fillRect(16, boxY, boxW, 32);
+      glow(K.blue, 8); cx.strokeStyle = K.blue; cx.lineWidth = 2; cx.strokeRect(16, boxY, boxW, 32); noGlow();
+
+      cx.font = '22px Arial';
+      cx.textAlign = 'left';
+      cx.textBaseline = 'middle';
+
+      // Dessin des cœurs
+      for (let h = 0; h < maxLives; h++) {
+        const isAlive = h < lives;
+        cx.globalAlpha = isAlive ? 1 : 0.3;
+        if (isAlive) glow(K.red, 15);
+        cx.fillStyle = isAlive ? K.red : '#444';
+        cx.fillText('❤', 24 + h * heartW, boxY + 18);
+        noGlow();
+      }
+      cx.globalAlpha = 1;
+
+      // Score et Dash (Déplacé en bas à droite pour ne pas cacher la charge temporelle)
+      cx.font = 'bold 10px Orbitron'; cx.textAlign = 'left'; cx.fillStyle = 'rgba(200,180,255,.6)'; cx.fillText(`SCORE ${score}`, 16, 55);
+      const dp = pl.dashCD > 0 ? 1 - pl.dashCD / pl.DASH_CD : 1, dw = 90, dh = 5, dx = W - dw - 16, dy = H - 18;
+      cx.fillStyle = '#0a0014'; cx.fillRect(dx, dy, dw, dh); cx.fillStyle = dp >= 1 ? K.pur : 'rgba(138,43,226,.38)'; cx.fillRect(dx, dy, dw * dp, dh);
+      glow(K.pur, 3); cx.strokeStyle = '#2a0040'; cx.lineWidth = .8; cx.strokeRect(dx, dy, dw, dh); noGlow();
+      cx.font = 'bold 6px Orbitron'; cx.textAlign = 'center'; cx.fillStyle = dp >= 1 ? K.pur : 'rgba(138,43,226,.4)'; cx.fillText(dp >= 1 ? 'DASH [ESPACE]' : 'DASH', dx + dw / 2, dy - 4);
+
+      // Hint Scan (RMB)
+      if (rmb) { cx.globalAlpha = .42 + Math.sin(globalTime / 200) * .28; cx.font = 'bold 7px Orbitron'; cx.fillStyle = K.gold; cx.fillText('🔍 SCAN ACTIF', W / 2, 20); cx.globalAlpha = 1; }
+    }
+
+    function drawCursor() {
+      cx.save(); glow(K.gold, rmb ? 12 : 4); cx.strokeStyle = K.gold; cx.lineWidth = rmb ? 2 : 1.2; cx.beginPath(); cx.arc(mx, my, rmb ? 8 : 5, 0, Math.PI * 2); cx.stroke();
+      if (rmb) { cx.beginPath(); cx.moveTo(mx - 12, my); cx.lineTo(mx + 12, my); cx.moveTo(mx, my - 12); cx.lineTo(mx, my + 12); cx.strokeStyle = 'rgba(255,215,0,.28)'; cx.lineWidth = .8; cx.stroke(); }
+      noGlow(); cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(mx, my, 1, 0, Math.PI * 2); cx.fill(); cx.restore();
+    }
+
+
+    // ═══════════════════════════════════════════════════
+    // MAIN DRAW
+    // ═══════════════════════════════════════════════════
+    function draw() {
+      const t = globalTime / 1000;
+      cx.clearRect(0, 0, W, H);
+      const sk = getSh(); cx.save(); cx.translate(sk.x, sk.y);
+      if (_glitchT > 0) { cx.save(); cx.globalCompositeOperation = 'screen'; cx.globalAlpha = .22; cx.translate((Math.random() - .5) * 14, 0); }
+      drawBackground(t);
+      const phase = bossState === BST.P2 ? 2 : (bossState === BST.P3 || bossState === BST.DYING || bossState === BST.END ? 3 : 1);
+      drawArena(t, phase);
+      // Coils + beams
+      if (bossState === BST.P1 || bossState === BST.P2) {
+        drawCoils(t);
+        drawLasers(t);
+        drawSaw(t, bossState === BST.P1);
+        drawShadow(t);
+      }
+      // Player
+      pl.draw(cx, globalTime, TSZ);
+      // P3 terminal decorations
+      if (bossState === BST.P3 || bossState === BST.END) drawP3Decorations(t);
+      // Boss character
+      if (bossState === BST.P1 || bossState === BST.TRANS) drawBossP1(t);
+      else if (bossState === BST.P2) drawBossP2(t);
+      else if (bossState === BST.P3 || bossState === BST.DYING || bossState === BST.END) drawBossP3(t);
+      // Particles
+      drawParts();
+      if (_glitchT > 0) cx.restore();
+      // Fire mode: golden vignette + target ring on boss clock face
+      // Fire mode: golden vignette + target ring on boss clock face
+      if (fireMode) {
+        const fmAlpha = .12 + Math.sin(t * 12) * .06; cx.globalAlpha = fmAlpha;
+        const fmGrad = cx.createRadialGradient(bossX, bossY, 0, bossX, bossY, Math.max(W, H) * .55);
+        fmGrad.addColorStop(0, K.gold); fmGrad.addColorStop(1, 'transparent');
+        cx.fillStyle = fmGrad; cx.fillRect(0, 0, W, H); cx.globalAlpha = 1;
+        const pulse2 = .7 + Math.sin(t * 14) * .3;
+        glow(K.gold, 28); cx.strokeStyle = K.gold; cx.lineWidth = 3 * pulse2;
+        cx.beginPath(); cx.arc(bossX, bossY - 10 * BSCL, clockR * 1.15, 0, Math.PI * 2); cx.stroke(); noGlow();
+      }
+      cx.restore();
+
+      // NOUVEAU : Dessin de l'UI et du curseur !
+      drawUI();
+      drawCursor();
+    }
+
+    // ═══════════════════════════════════════════════════
+    // INPUT
+    // ═══════════════════════════════════════════════════
+    const dirKeys = {
+      ArrowUp: { dx: 0, dy: -1 }, ArrowDown: { dx: 0, dy: 1 }, ArrowLeft: { dx: -1, dy: 0 }, ArrowRight: { dx: 1, dy: 0 },
+      KeyW: { dx: 0, dy: -1 }, KeyS: { dx: 0, dy: 1 }, KeyA: { dx: -1, dy: 0 }, KeyD: { dx: 1, dy: 0 }, KeyZ: { dx: 0, dy: -1 }, KeyQ: { dx: -1, dy: 0 }
+    };
+    document.addEventListener('keydown', e => {
+      unlockAudio();
+      if (isDialogActive) { if (e.code === 'Space' || e.code === 'Enter') { showNextDialogue(); e.preventDefault(); } return; }
+      if (bossState === BST.END) return;
+      if (bossState !== BST.TRANS && bossState !== BST.DYING && bossState !== BST.END) {
+        if (dirKeys[e.code]) { if (!pl.iq || !pl.mv) { pl.iq = dirKeys[e.code]; pl.lDir = dirKeys[e.code]; } }
+        if (e.code === 'Space' && bossState !== BST.P2) pl.tryDash();
+        if (e.code === 'KeyV' && bossState !== BST.P2) pl.tryClone();
+        if (e.code === 'KeyC') pl.tryInvis();
+        if (e.code === 'KeyX') pl.trySlowmo();
+      }
+      e.preventDefault();
+    });
+    window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+    cv.addEventListener('mousedown', e => {
+      unlockAudio();
+      if (isDialogActive && e.button === 0) { showNextDialogue(); e.preventDefault(); return; }
+      if (e.button === 0) {
+        lmb = true;
+        if (fireMode && (bossState === BST.P1 || bossState === BST.P2)) {
+          const dx = e.clientX - bossX, dy = e.clientY - (bossY - 10 * BSCL);
+          if (Math.sqrt(dx * dx + dy * dy) < clockR * 2.8) onPlayerFire();
+        }
+      }
+      if (e.button === 2) { rmb = true; e.preventDefault(); }
+    });
+    cv.addEventListener('mouseup', e => { if (e.button === 0) lmb = false; if (e.button === 2) rmb = false; });
+    cv.addEventListener('contextmenu', e => e.preventDefault());
+
+    // ═══════════════════════════════════════════════════
+    // GAME LOOP & BOOT
+    // ═══════════════════════════════════════════════════
+    function loop(ts) { update(ts); draw(); requestAnimationFrame(loop); }
+    resize(); buildGrid('full'); pl.reset(spawnP1.x, spawnP1.y); pl.inv = 1800;
+    bossState = BST.INTRO;
+    pageFlip('CHRONOS', 'LE MAÎTRE DU TEMPS — PALIER 40', () => { startP1(); });
+    requestAnimationFrame(loop);
+  </script>
+</body>
+
+</html>

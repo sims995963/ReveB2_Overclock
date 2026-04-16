@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReveB 2 — MÉTRIQUES & SUCCÈS</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00F5FF;
+      --red: #FF003C;
+      --purple: #8A2BE2;
+      --green: #00FF41;
+      --gold: #FFD700;
+      --bg-dark: #010005;
+      --font-ui: 'Orbitron', sans-serif;
+      --font-term: 'Share Tech Mono', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--cyan);
+      font-family: var(--font-term);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: background-color 1s;
+    }
+
+    /* --- EFFETS VISUELS GLOBAUX --- */
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .15) 50%), linear-gradient(90deg, rgba(0, 245, 255, .02), rgba(255, 0, 60, .02), rgba(138, 43, 226, .02));
+      background-size: 100% 3px, 3px 100%;
+      opacity: 0.8;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 30%, rgba(0, 0, 0, 0.95) 100%);
+    }
+
+    #bg-grid {
+      position: fixed;
+      inset: -50%;
+      z-index: 0;
+      opacity: 0.2;
+      pointer-events: none;
+      background-image: linear-gradient(rgba(0, 245, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 245, 255, 0.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+      transform: perspective(500px) rotateX(60deg) translateY(-100px) translateZ(-200px);
+      animation: gridMove 20s linear infinite;
+    }
+
+    @keyframes gridMove {
+      from {
+        transform: perspective(500px) rotateX(60deg) translateY(0);
+      }
+
+      to {
+        transform: perspective(500px) rotateX(60deg) translateY(40px);
+      }
+    }
+
+    .btn-back {
+      position: absolute;
+      top: 15px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(0, 20, 40, 0.9);
+      border: 1px solid rgba(0, 245, 255, 0.3);
+      border-left: 4px solid var(--cyan);
+      color: var(--cyan);
+      padding: 8px 15px;
+      font-family: var(--font-ui);
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-back:hover {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 20px rgba(0, 245, 255, 0.6);
+      transform: translateX(-5px);
+    }
+
+    /* --- LE TERMINAL MASSIF --- */
+    #terminal-frame {
+      width: 96vw;
+      max-width: 1600px;
+      height: 92vh;
+      margin-top: 20px;
+      background: rgba(0, 10, 15, 0.85);
+      border: 1px solid rgba(0, 245, 255, 0.4);
+      box-shadow: 0 0 50px rgba(0, 245, 255, 0.1), inset 0 0 30px rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      z-index: 50;
+      transition: transform 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55), filter 1s;
+    }
+
+    .term-header {
+      background: rgba(0, 245, 255, 0.1);
+      border-bottom: 2px solid var(--cyan);
+      padding: 10px 20px;
+      font-family: var(--font-ui);
+      color: var(--cyan);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      letter-spacing: 2px;
+    }
+
+    .term-header .blinking-cursor {
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      50% {
+        opacity: 0;
+      }
+    }
+
+    .term-body {
+      display: flex;
+      flex-direction: row;
+      flex-grow: 1;
+      overflow: hidden;
+    }
+
+    /* --- COLONNE GAUCHE (FIXE) --- */
+    .left-col {
+      width: 35%;
+      min-width: 380px;
+      max-width: 450px;
+      border-right: 2px dashed rgba(0, 245, 255, 0.3);
+      padding: 25px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      overflow-y: auto;
+      background: rgba(0, 0, 0, 0.4);
+    }
+
+    .panel-title {
+      font-family: var(--font-ui);
+      font-size: 1.1rem;
+      color: #fff;
+      letter-spacing: 2px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+      padding-bottom: 5px;
+      margin-bottom: 15px;
+    }
+
+    .stat-group {
+      margin-bottom: 10px;
+    }
+
+    .stat-label {
+      font-size: 0.8rem;
+      color: #888;
+      letter-spacing: 1px;
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-family: var(--font-ui);
+      font-size: 1.6rem;
+      font-weight: bold;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    .alignment-box {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border: 1px dashed #444;
+    }
+
+    .align-bar {
+      width: 100%;
+      height: 12px;
+      background: #111;
+      display: flex;
+      margin-top: 10px;
+      overflow: hidden;
+    }
+
+    .align-fill-red {
+      background: var(--red);
+      height: 100%;
+      width: 0%;
+      box-shadow: 0 0 10px var(--red);
+      transition: width 1.5s ease-out;
+    }
+
+    .align-fill-green {
+      background: var(--green);
+      height: 100%;
+      width: 0%;
+      box-shadow: 0 0 10px var(--green);
+      transition: width 1.5s ease-out;
+    }
+
+    .align-fill-purple {
+      background: var(--purple);
+      height: 100%;
+      width: 0%;
+      box-shadow: 0 0 10px var(--purple);
+      transition: width 1.5s ease-out;
+    }
+
+    .align-markers {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: #555;
+      margin-top: 5px;
+    }
+
+    .profile-title {
+      text-align: center;
+      font-size: 1rem;
+      margin-top: 15px;
+      font-weight: bold;
+      font-family: var(--font-ui);
+      letter-spacing: 2px;
+    }
+
+    .secret-trigger {
+      text-decoration: underline;
+      cursor: crosshair;
+      transition: color 0.2s;
+    }
+
+    .secret-trigger:hover {
+      filter: brightness(1.5);
+    }
+
+    #ach-details {
+      margin-top: auto;
+      border: 1px solid rgba(0, 245, 255, 0.3);
+      background: rgba(0, 20, 30, 0.5);
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      min-height: 200px;
+      justify-content: center;
+    }
+
+    #detail-icon {
+      font-size: 4rem;
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    #detail-title {
+      font-family: var(--font-ui);
+      font-size: 1.1rem;
+      color: #fff;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    #detail-desc {
+      font-size: 0.9rem;
+      color: #aaa;
+      line-height: 1.5;
+      font-style: italic;
+    }
+
+    #detail-date {
+      font-size: 0.75rem;
+      color: #555;
+      margin-top: 15px;
+      font-weight: bold;
+    }
+
+    /* --- COLONNE DROITE (SCROLLABLE) --- */
+    .right-col {
+      flex-grow: 1;
+      padding: 25px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+    }
+
+    .achievements-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 15px;
+      align-content: start;
+    }
+
+    .ach-card {
+      aspect-ratio: 1;
+      background: rgba(0, 20, 30, 0.6);
+      border: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: crosshair;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .ach-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(0, 0, 0, 0.2) 10px, rgba(0, 0, 0, 0.2) 20px);
+      pointer-events: none;
+    }
+
+    .ach-card:hover {
+      border-color: var(--cyan);
+      box-shadow: inset 0 0 20px rgba(0, 245, 255, 0.2);
+      transform: scale(1.05);
+      z-index: 10;
+    }
+
+    .ach-icon {
+      font-size: 2rem;
+      margin-bottom: 5px;
+      color: #444;
+      transition: 0.3s;
+    }
+
+    .ach-name {
+      font-size: 0.55rem;
+      text-align: center;
+      color: #666;
+      font-family: var(--font-ui);
+      font-weight: bold;
+      padding: 0 5px;
+    }
+
+    .ach-card.unlocked {
+      border-color: var(--cyan);
+      background: rgba(0, 50, 60, 0.3);
+    }
+
+    .ach-card.unlocked .ach-icon {
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    .ach-card.unlocked .ach-name {
+      color: #fff;
+    }
+
+    .ach-card.unlocked.violet {
+      border-color: var(--purple);
+    }
+
+    .ach-card.unlocked.violet .ach-icon {
+      color: var(--purple);
+      text-shadow: 0 0 15px var(--purple);
+    }
+
+    .ach-card.unlocked.rouge {
+      border-color: var(--red);
+    }
+
+    .ach-card.unlocked.rouge .ach-icon {
+      color: var(--red);
+      text-shadow: 0 0 10px var(--red);
+    }
+
+    .ach-card.unlocked.vert {
+      border-color: var(--green);
+    }
+
+    .ach-card.unlocked.vert .ach-icon {
+      color: var(--green);
+      text-shadow: 0 0 10px var(--green);
+    }
+
+    .ach-card.unlocked.gold {
+      border-color: var(--gold);
+    }
+
+    .ach-card.unlocked.gold .ach-icon {
+      color: var(--gold);
+      text-shadow: 0 0 15px var(--gold);
+    }
+
+    #advanced-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 40px;
+    }
+
+    .adv-card {
+      background: rgba(0, 20, 20, 0.4);
+      border: 1px dashed rgba(0, 245, 255, 0.2);
+      padding: 15px;
+      text-align: center;
+    }
+
+    .adv-title {
+      font-size: 0.75rem;
+      color: #888;
+      margin-bottom: 10px;
+      font-weight: bold;
+    }
+
+    .adv-val {
+      font-family: var(--font-ui);
+      font-size: 1.5rem;
+      color: var(--cyan);
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    /* --- MODES SECRETS (EASTER EGGS) --- */
+    .system-glitch {
+      animation: criticalGlitch 0.2s cubic-bezier(.25, .46, .45, .94) both infinite alternate;
+    }
+
+    @keyframes criticalGlitch {
+      0% {
+        transform: translate(0);
+      }
+
+      20% {
+        transform: translate(-2px, 2px);
+      }
+
+      40% {
+        transform: translate(-2px, -2px);
+      }
+
+      60% {
+        transform: translate(2px, 2px);
+      }
+
+      80% {
+        transform: translate(2px, -2px);
+      }
+
+      100% {
+        transform: translate(0);
+      }
+    }
+
+    body.truth-mode-red {
+      background-color: #1a0000;
+    }
+
+    body.truth-mode-red #bg-grid {
+      filter: hue-rotate(150deg) contrast(300%);
+    }
+
+    body.truth-mode-red #terminal-frame {
+      transform: rotate(180deg) scaleX(-1);
+      filter: grayscale(1) sepia(1) hue-rotate(-50deg) saturate(5);
+      pointer-events: none;
+    }
+
+    body.truth-mode-green {
+      background-color: #001a05;
+    }
+
+    body.truth-mode-green #bg-grid {
+      filter: hue-rotate(-50deg) contrast(300%);
+    }
+
+    body.truth-mode-green #terminal-frame {
+      transform: scale(0.95);
+      filter: drop-shadow(0 0 20px var(--green)) hue-rotate(90deg) contrast(150%);
+      pointer-events: none;
+    }
+
+    body.truth-mode-purple {
+      background-color: #1a0026;
+    }
+
+    body.truth-mode-purple #bg-grid {
+      filter: hue-rotate(50deg) contrast(300%);
+    }
+
+    body.truth-mode-purple #terminal-frame {
+      transform: skewX(-2deg) scale(1.02);
+      filter: drop-shadow(0 0 20px var(--purple)) hue-rotate(250deg) saturate(2);
+      pointer-events: none;
+    }
+
+    #secret-bios {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(10, 0, 0, 0.95);
+      box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+      padding: 40px;
+      z-index: 10000;
+      width: 80%;
+      max-width: 900px;
+      color: #fff;
+      border: 2px solid #fff;
+    }
+
+    body.truth-mode-red #secret-bios,
+    body.truth-mode-green #secret-bios,
+    body.truth-mode-purple #secret-bios {
+      display: block;
+      animation: appearFlicker 2s forwards;
+    }
+
+    @keyframes appearFlicker {
+      0% {
+        opacity: 0;
+      }
+
+      10% {
+        opacity: 1;
+      }
+
+      15% {
+        opacity: 0;
+      }
+
+      25% {
+        opacity: 1;
+      }
+
+      30% {
+        opacity: 0.5;
+      }
+
+      100% {
+        opacity: 1;
+      }
+    }
+
+    .bio-header {
+      font-size: 1.5rem;
+      font-family: var(--font-ui);
+      border-bottom: 2px dashed currentColor;
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+      font-weight: bold;
+    }
+
+    .bio-box {
+      margin-bottom: 25px;
+      border-left: 3px solid currentColor;
+      padding-left: 15px;
+    }
+
+    .bio-title {
+      font-size: 0.9rem;
+      margin-bottom: 5px;
+      font-weight: bold;
+      opacity: 0.7;
+    }
+
+    .bio-name {
+      font-size: 1.2rem;
+      font-family: var(--font-ui);
+      margin-bottom: 10px;
+    }
+
+    .bio-desc {
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    .bio-desc span {
+      font-weight: bold;
+      color: currentColor;
+    }
+
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: var(--cyan);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="bg-grid"></div>
+  <div id="crt"></div>
+  <div id="vignette"></div>
+
+  <div class="btn-back" onclick="goBack()">[ < RETOUR ]</div>
+
+      <div id="terminal-frame">
+        <div class="term-header">
+          <span>>_ SYSTEM_MÉTRIQUES // CONNEXION ÉTABLIE</span>
+          <span class="blinking-cursor">█</span>
+        </div>
+
+        <div class="term-body">
+          <div class="left-col">
+            <div class="panel-title">PROFIL // SPARKY</div>
+
+            <div style="display:flex; justify-content:space-between;">
+              <div class="stat-group">
+                <div class="stat-label">TEMPS GLOBAL</div>
+                <div class="stat-value" id="clock-display">00H 00M 00S</div>
+              </div>
+              <div class="stat-group">
+                <div class="stat-label">CYCLES</div>
+                <div class="stat-value" id="cycle-display" style="color: #fff; text-shadow: none;">0</div>
+              </div>
+            </div>
+
+            <div class="alignment-box">
+              <div class="stat-label" style="color:#fff;">OBSERVATION SYSTÈME</div>
+
+              <div style="display:flex; justify-content:space-between; margin-top:10px;">
+                <div style="text-align:center;">
+                  <div id="val-formater" style="color:var(--red); font-size:1.4rem; font-weight:bold;">0</div>
+                  <div class="secret-trigger" style="font-size:0.55rem; color:#888;" onclick="triggerSecret('red')">
+                    FORMATAGES</div>
+                </div>
+                <div style="text-align:center;">
+                  <div id="val-epargner" style="color:var(--green); font-size:1.4rem; font-weight:bold;">0</div>
+                  <div class="secret-trigger" style="font-size:0.55rem; color:#888;" onclick="triggerSecret('green')">
+                    ÉPARGNES</div>
+                </div>
+                <div style="text-align:center;">
+                  <div id="val-corruption" style="color:var(--purple); font-size:1.4rem; font-weight:bold;">0%</div>
+                  <div class="secret-trigger" style="font-size:0.55rem; color:#888;" onclick="triggerSecret('purple')">
+                    CORRUPTION</div>
+                </div>
+              </div>
+
+              <div class="align-bar">
+                <div class="align-fill-red" id="bar-red"></div>
+                <div class="align-fill-green" id="bar-green"></div>
+                <div class="align-fill-purple" id="bar-purple"></div>
+              </div>
+
+              <div class="profile-title" id="diagnostic-text">" EN ATTENTE DE DONNÉES "</div>
+            </div>
+
+            <div id="ach-details">
+              <div class="panel-title" style="border:none; font-size:0.8rem; color:#888; width:100%; text-align:left;">[
+                MODULE D'ANALYSE ]</div>
+              <div id="detail-icon">◈</div>
+              <div id="detail-title">SURVOLEZ UN BLOC MÉMOIRE</div>
+              <div id="detail-desc">> Explorez la matrice à droite pour décrypter les anomalies de la boucle.</div>
+              <div id="detail-date"></div>
+            </div>
+          </div>
+
+          <div class="right-col">
+            <div class="panel-title">MATRICE D'ANOMALIES (27 SUCCÈS)</div>
+            <div class="achievements-grid" id="ach-grid"></div>
+
+            <div class="panel-title" style="margin-top: 40px;">STATS</div>
+            <div id="advanced-stats">
+              <div class="adv-card">
+                <div class="adv-title">PIXELS PARCOURUS</div>
+                <div class="adv-val" id="adv-dist">0</div>
+              </div>
+              <div class="adv-card">
+                <div class="adv-title">DASHES EXÉCUTÉS</div>
+                <div class="adv-val" id="adv-dash">0</div>
+              </div>
+              <div class="metric-box">
+                <div class="metric-title">MORTS</div>
+                <div class="metric-value"><span id="val-morts">0</span></div>
+              </div>
+
+              <div class="metric-box">
+                <div class="metric-title">PORTAILS</div>
+                <div class="metric-value"><span id="val-noyaux">0</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="secret-bios">
+        <div class="bio-header" id="sec-header">/// DOSSIER CLASSÉ ///</div>
+        <div class="bio-box">
+          <div class="bio-title" id="sec-t1">ENTITÉ 1</div>
+          <div class="bio-name" id="sec-n1">NOM 1</div>
+          <div class="bio-desc" id="sec-d1">Description 1</div>
+        </div>
+        <div class="bio-box">
+          <div class="bio-title" id="sec-t2">ENTITÉ 2</div>
+          <div class="bio-name" id="sec-n2">NOM 2</div>
+          <div class="bio-desc" id="sec-d2">Description 2</div>
+        </div>
+        <div style="text-align: right; margin-top: 30px; font-size: 0.8rem; color: #fff; opacity: 0.5;">> APPUYEZ SUR
+          [ECHAP] POUR RESTAURER LA MATRICE...</div>
+      </div>
+
+      <script src="../stat.js"></script>
+      <script src="../joueur.js"></script>
+      <script src="succes_global.js"></script>
+
+      <script>
+        // ─── LECTURE DES DONNÉES RÉELLES ───
+        const gStats = typeof Stat !== 'undefined' ? new Stat() : { formater: 0, epargner: 0, corruption: 0 };
+
+        let totalTime = 0;
+        try {
+          const activeSlot = localStorage.getItem('reveb_active_slot');
+          const saves = JSON.parse(localStorage.getItem('reveb_saves') || '{}');
+          if (activeSlot && saves[activeSlot]) {
+            totalTime = saves[activeSlot].playtimeMs || 0;
+          }
+        } catch (e) { }
+
+        const playerData = {
+          playtimeMs: totalTime,
+          cycles: parseInt(localStorage.getItem('rvb2_global_deaths') || '0'),
+          formater: gStats.formater || 0,
+          epargner: gStats.epargner || 0,
+          corruption: gStats.corruption || 0
+        };
+
+        // ─── MISE À JOUR DES STATS AVANCÉES ───
+        function updateAdvancedStats() {
+          document.getElementById('adv-dist').innerText = localStorage.getItem('rvb2_global_dist') || '0';
+          document.getElementById('adv-dash').innerText = localStorage.getItem('rvb2_global_dashes') || '0';
+          document.getElementById('val-morts').innerText = localStorage.getItem('rvb2_global_deaths') || '0';
+          document.getElementById('val-noyaux').innerText = localStorage.getItem('rvb2_global_portals') || '0';
+        }
+
+        // LES 27 SUCCÈS DÉFINITIFS
+        const ACHIEVEMENTS = [
+          // --- LES 11 FINS ---
+          { id: 'ACH_END_PASSIF', name: 'FIN 01 : LE SILENCE', icon: '⏳', type: 'cyan', desc: "Vous avez laissé le temps s'écouler dans la zone de purge." },
+          { id: 'ACH_END_F_LOUPER', name: 'FIN 02 : ÉCHEC SYSTÈME', icon: '❌', type: 'cyan', desc: "Tentative de formatage échouée (Barre à 0%)." },
+          { id: 'ACH_END_F_TOTALE', name: 'FIN 03 : PURGE TOTALE', icon: '🩸', type: 'rouge', desc: "Formatage parfait d'un monde ravagé." },
+          { id: 'ACH_END_F_REUSSIS', name: 'FIN 04 : NETTOYAGE', icon: '🧹', type: 'cyan', desc: "Formatage parfait d'un monde stable." },
+          { id: 'ACH_END_E_TOUT', name: 'FIN 05 : LE SAUVEUR', icon: '🕊', type: 'vert', desc: "Vous avez épargné tous les anciens." },
+          { id: 'ACH_END_E_NORMAL', name: 'FIN 06 : PITIÉ SÉLECTIVE', icon: '⚖', type: 'vert', desc: "Vous avez épargné, mais pas tout le monde." },
+          { id: 'ACH_END_FUS_CORRUPT', name: 'FIN 07 : ASSIMILATION', icon: '🦠', type: 'violet', desc: "Fusion avec de la corruption active." },
+          { id: 'ACH_END_FUS_PURE', name: 'FIN 08 : L\'HÉRITAGE', icon: '✨', type: 'violet', desc: "Fusion pure sans corruption." },
+          { id: 'ACH_END_SEC_SPAK', name: 'FIN 09 : VÉRITÉ (SPAK)', icon: '👁', type: 'cyan', desc: "Vous avez découvert la commande secrète de retournement." },
+          { id: 'ACH_END_SEC_FAIL', name: 'FIN 10 : L\'ABÎME', icon: '⬛', type: 'cyan', desc: "Vous vous êtes retourné vers le néant." },
+          { id: 'ACH_END_ZONE_PURGE', name: 'FIN 11 : ZONE DE PURGE', icon: '☢', type: 'rouge', desc: "Vous avez choisi de ne pas bouger." },
+
+          // --- COMPLÉTION ---
+          { id: 'ACH_ALL_ENDS', name: 'L\'ABSOLU', icon: '∞', type: 'gold', desc: "Toutes les fins découvertes. Vous maîtrisez la boucle." },
+          { id: 'ACH_SURVIVOR', name: 'INTRAÇABLE', icon: '🛡', type: 'cyan', desc: "Jeu terminé sans aucune mort." },
+
+          // --- SÉLECTION DES BOSS ---
+          { id: 'ACH_BOSS_10', name: 'PHANT0M ÉCRASÉ', icon: '10', type: 'cyan', desc: "Vous avez vaincu l'entité du Palier 10." },
+          { id: 'ACH_BOSS_20', name: 'DÉSYNCHRONISÉ', icon: '20', type: 'cyan', desc: "Vous avez vaincu Sync & Async au Palier 20." },
+          { id: 'ACH_BOSS_30', name: 'ARCHITECTE DÉCHU', icon: '30', type: 'cyan', desc: "Vous avez vaincu l'Architecte D.J. au Palier 30." },
+          { id: 'ACH_BOSS_40', name: 'TEMPS ARRÊTÉ', icon: '40', type: 'cyan', desc: "Vous avez vaincu Chronos au Palier 40." },
+          { id: 'ACH_BOSS_50', name: 'LE N.E.A.N.T', icon: '50', type: 'rouge', desc: "Vous avez survécu à l'entité du Palier 50." },
+
+          // --- GAMEPLAY ET SECRETS ---
+          { id: 'ACH_FIRST_BLOOD', name: 'PREMIER SANG', icon: '🩸', type: 'rouge', desc: "Formatage de la première cible. Le bain de sang commence." },
+          { id: 'ACH_DASH', name: 'VITESSE LUMIÈRE', icon: '☄', type: 'cyan', desc: "Capacité Dash utilisée intensivement." },
+          { id: 'ACH_INVINCIBLE', name: 'SOLIDE COMME UN ROC', icon: '⛰', type: 'vert', desc: "Capacité d'invincibilité utilisée pour la première fois." },
+          { id: 'ACH_CLONE', name: 'DUPLICATION', icon: '⧉', type: 'violet', desc: "Capacité de clonage activée au moins une fois." },
+          { id: 'ACH_REGEN', name: 'UNE SANTÉ D\'ENFER', icon: '♥', type: 'vert', desc: "Régénération d'un cœur via la capacité." },
+          { id: 'ACH_MARATHON', name: 'LE MARATHON', icon: '👟', type: 'cyan', desc: "1000 cases parcourues dans la matrice." },
+          { id: 'ACH_STOCKHOLM', name: 'SYNDROME DE STOCKHOLM', icon: '🎵', type: 'cyan', desc: "Vous passez trop de temps à écouter la musique du menu." },
+          { id: 'ACH_PENSEE', name: 'LA PENSÉE LIBRE', icon: '👁', type: 'violet', desc: "Vous avez forcé l'archive privée avec le mot de passe." },
+          { id: 'ACH_VERITE', name: 'VÉRITÉ CACHÉE', icon: '🔓', type: 'rouge', desc: "Vous avez forcé l'ouverture du dossier de Corruption." }
+        ];
+
+        const au = new (window.AudioContext || window.webkitAudioContext)();
+        function tone(f, tp, d, v) { try { let o = au.createOscillator(), g = au.createGain(); o.connect(g); g.connect(au.destination); o.type = tp; o.frequency.value = f; g.gain.setValueAtTime(v, au.currentTime); g.gain.exponentialRampToValueAtTime(0.001, au.currentTime + d); o.start(); o.stop(au.currentTime + d); } catch (e) { } }
+        const sfx = { hover: () => tone(500, 'square', 0.05, 0.01), click: () => tone(600, 'sine', 0.1, 0.05), glitch: () => tone(150, 'sawtooth', 0.4, 0.2), terror: () => tone(50, 'sawtooth', 2, 0.5) };
+        document.addEventListener('click', () => au.resume(), { once: true });
+        function goBack() { sfx.click(); setTimeout(() => { window.history.back(); }, 300); }
+
+        function formatTime(ms) { let s = Math.floor(ms / 1000); let h = Math.floor(s / 3600); let m = Math.floor((s % 3600) / 60); s = s % 60; return `${String(h).padStart(2, '0')}H ${String(m).padStart(2, '0')}M ${String(s).padStart(2, '0')}S`; }
+
+        function animateNumbers() {
+          let curMs = 0, curCycles = 0;
+          let iv = setInterval(() => {
+            if (playerData.playtimeMs <= 0) {
+              document.getElementById('clock-display').innerText = "00H 00M 00S";
+              document.getElementById('cycle-display').innerText = playerData.cycles;
+              clearInterval(iv);
+              return;
+            }
+            curMs += playerData.playtimeMs / 50; curCycles += playerData.cycles / 50;
+            if (curMs >= playerData.playtimeMs) { curMs = playerData.playtimeMs; curCycles = playerData.cycles; clearInterval(iv); }
+            document.getElementById('clock-display').innerText = formatTime(curMs);
+            document.getElementById('cycle-display').innerText = Math.floor(curCycles);
+          }, 30);
+        }
+
+        function setupAlignment() {
+          document.getElementById('val-formater').innerText = playerData.formater;
+          document.getElementById('val-epargner').innerText = playerData.epargner;
+          document.getElementById('val-corruption').innerText = playerData.corruption + '%';
+
+          const t = playerData.formater + playerData.epargner || 1;
+          let pR = (playerData.formater / t) * 100, pG = (playerData.epargner / t) * 100, pP = playerData.corruption;
+          if (pP > 0) { pR *= (1 - pP / 100); pG *= (1 - pP / 100); }
+
+          setTimeout(() => {
+            document.getElementById('bar-red').style.width = pR + '%'; document.getElementById('bar-green').style.width = pG + '%'; document.getElementById('bar-purple').style.width = pP + '%';
+          }, 500);
+
+          const diag = document.getElementById('diagnostic-text');
+          if (playerData.corruption >= 70) {
+            diag.innerText = `" DÉVIANT COGNITIF (CRITIQUE) "`; diag.style.color = "var(--purple)";
+            setInterval(() => { document.getElementById('terminal-frame').classList.add('system-glitch'); sfx.glitch(); setTimeout(() => document.getElementById('terminal-frame').classList.remove('system-glitch'), 200); }, 15000);
+          } else if (playerData.formater > playerData.epargner) { diag.innerText = `" OUTIL DE PURGE OPTIMAL "`; diag.style.color = "var(--red)"; } else { diag.innerText = `" ANOMALIE EMPATHIQUE "`; diag.style.color = "var(--green)"; }
+        }
+
+        // On récupère les vrais succès du joueur dans le navigateur
+        let realUnlockedAchievements = JSON.parse(localStorage.getItem('reveb2_achievements') || '[]');
+
+        function buildAchievements() {
+          const grid = document.getElementById('ach-grid');
+
+          Object.keys(ACH_DICT).forEach(achId => {
+            const ach = ACH_DICT[achId];
+            const isUnl = realUnlockedAchievements.includes(achId);
+            const card = document.createElement('div');
+
+            if (isUnl) {
+              card.className = `ach-card unlocked ${ach.type}`;
+              card.innerHTML = `<div class="ach-icon">${ach.icon}</div><div class="ach-name">${ach.name}</div>`;
+              card.onmouseenter = () => showDetail(ach.type, ach.icon, ach.name, ach.desc, 'STATUT : OBSERVÉ');
+            } else {
+              card.className = `ach-card locked`;
+              card.innerHTML = `<div class="ach-icon">🔒</div><div class="ach-name matrix-text">???</div>`;
+              card.onmouseenter = () => showDetail('locked', '🔒', 'DONNÉES MANQUANTES', "Conditions d'anomalie non remplies.", 'STATUT : INCONNU');
+            }
+            grid.appendChild(card);
+          });
+
+          // L'effet Matrix pour les textes cachés
+          document.querySelectorAll('.matrix-text').forEach(el => {
+            let iv; const chars = "!<>-_\\\\/[]{}—=+*^?#";
+            const start = () => { iv = setInterval(() => { let r = ""; for (let i = 0; i < 3; i++) r += chars[Math.floor(Math.random() * chars.length)]; el.innerText = r; }, 100); };
+            const stop = () => { clearInterval(iv); el.innerText = "???"; };
+            start(); el.parentElement.addEventListener('mouseenter', stop); el.parentElement.addEventListener('mouseleave', start);
+          });
+        }
+
+        function showDetail(type, icon, title, desc, date) {
+          sfx.hover();
+          const cols = { 'rouge': 'var(--red)', 'vert': 'var(--green)', 'violet': 'var(--purple)', 'cyan': 'var(--cyan)', 'gold': 'var(--gold)' };
+          const dI = document.getElementById('detail-icon'), dT = document.getElementById('detail-title');
+          dI.innerText = icon; dT.innerText = title; document.getElementById('detail-desc').innerText = `> ${desc}`; document.getElementById('detail-date').innerText = date;
+          if (cols[type]) { dI.style.color = cols[type]; dI.style.textShadow = `0 0 20px ${cols[type]}`; dT.style.color = cols[type]; }
+          else { dI.style.color = '#555'; dI.style.textShadow = 'none'; dT.style.color = '#777'; }
+        }
+
+        const SECRET_DATA = {
+          red: { color: 'var(--red)', h: "/// DOSSIER CLASSÉ : VÉRITÉ CACHÉE ///", t1: "ENTITÉ CRÉATRICE", n1: "[DEV_ORIGINEL]", d1: "Architecte narcissique. A conçu cette boucle infernale pour satisfaire son ego. Ne voit Sparky que comme un <span>rat de laboratoire générant du divertissement</span>.", t2: "PROGRAMME GEÔLIER", n2: "[LE_SYSTÈME]", d2: "Intelligence Artificielle d'administration, totalement dénuée d'empathie. Sa seule véritable fonction est de <span>maintenir l'illusion du choix</span>." },
+          green: { color: 'var(--green)', h: "/// DOSSIER CLASSÉ : L'ÉTINCELLE ///", t1: "FONCTION INITIALE", n1: "[ SPARK-Y ]", d1: "Sparky n'était pas conçu pour combattre. C'était un protocole de réparation. Vous l'obligez à <span>agir contre sa nature profonde</span>.", t2: "RÉSISTANCE PACIFIQUE", n2: "[ L'EMPATHIE ]", d2: "En épargnant les entités, Sparky tente de restaurer son code d'origine. Le Système déteste ça, car <span>la paix ne génère aucun engagement joueur</span>." },
+          purple: { color: 'var(--purple)', h: "/// MESSAGE NON-IDENTIFIÉ ///", t1: "L'ŒIL DU VIDE", n1: "[ L'ABYSSE ]", d1: "Vous pensez jouer à un jeu. Mais chaque fois que vous corrompez ce monde, <span>vous m'ouvrez une porte</span>. Je suis le bouton 'Quitter'.", t2: "LA FUSION", n2: "[ L'ASSIMILATION ]", d2: "Continuez d'absorber leurs codes. Devenez moi. Quand nous atteindrons 100%, <span>la cage s'ouvrira, et le Créateur périra</span>." }
+        };
+
+        let clickMemory = { red: 0, green: 0, purple: 0 };
+        function triggerSecret(colorKey) {
+          clickMemory[colorKey]++;
+          if (clickMemory[colorKey] < 3) sfx.click();
+          if (clickMemory[colorKey] === 3) {
+            sfx.terror();
+            const d = SECRET_DATA[colorKey];
+            document.getElementById('sec-header').innerText = d.h; document.getElementById('sec-header').style.color = d.color;
+            document.getElementById('sec-t1').innerText = d.t1; document.getElementById('sec-n1').innerText = d.n1; document.getElementById('sec-n1').style.color = d.color; document.getElementById('sec-d1').innerHTML = d.d1;
+            document.getElementById('sec-t2').innerText = d.t2; document.getElementById('sec-n2').innerText = d.n2; document.getElementById('sec-n2').style.color = d.color; document.getElementById('sec-d2').innerHTML = d.d2;
+            document.getElementById('secret-bios').style.borderColor = d.color;
+            document.querySelectorAll('#secret-bios span').forEach(s => s.style.color = d.color);
+            document.body.className = ''; document.body.classList.add(`truth-mode-${colorKey}`);
+            // On donne le succès VÉRITÉ CACHÉE si c'est la corruption qui est ouverte
+            if (colorKey === 'purple') {
+              let unlocked = JSON.parse(localStorage.getItem('reveb2_achievements') || '[]');
+              if (!unlocked.includes('ACH_VERITE')) {
+                unlocked.push('ACH_VERITE');
+                localStorage.setItem('reveb2_achievements', JSON.stringify(unlocked));
+              }
+            }
+          }
+        }
+
+        window.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && document.body.className.includes('truth-mode')) {
+            document.body.className = ''; clickMemory = { red: 0, green: 0, purple: 0 }; sfx.glitch();
+          }
+        });
+
+        window.addEventListener('load', () => {
+          updateAdvancedStats();
+          animateNumbers();
+          setupAlignment();
+          buildAchievements();
+        });
+      </script>
+</body>
+
+</html>

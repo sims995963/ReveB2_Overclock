@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Boss 40 : CHRONOS (Phases 1-2-3)</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#020005;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff; cursor:crosshair;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.3) 50%),linear-gradient(90deg,rgba(0,245,255,0.03),rgba(255,0,60,0.03),rgba(138,43,226,0.03));background-size:100% 2px, 3px 100%;opacity:0.7;}
+#vignette{position:fixed;inset:0;z-index:89;pointer-events:none;background:radial-gradient(circle at center, transparent 30%, #000 120%);}
+
+#ui-panel {
+    position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 100;
+    display: flex; flex-direction: column; align-items: center; gap: 15px;
+    background: rgba(5, 5, 15, 0.85); padding: 15px 30px;
+    border: 2px solid #00F5FF; border-radius: 8px; box-shadow: 0 0 20px rgba(0,245,255,0.4);
+    backdrop-filter: blur(5px); transition: all 0.4s;
+}
+
+#boss-name { font-family: 'Orbitron', sans-serif; font-size: 26px; font-weight: 900; letter-spacing: 5px; color: #00F5FF; text-shadow: 0 0 15px #00F5FF; transition: all 0.4s;}
+.row { display: flex; gap: 15px; margin-top: 10px; }
+
+.btn { 
+    padding: 10px 15px; border: 2px solid #00F5FF; background: transparent; color: #00F5FF; 
+    font-size: 1rem; font-family: 'Orbitron', sans-serif; font-weight: bold; letter-spacing: 1px; 
+    cursor: pointer; transition: all 0.2s;
+}
+.btn:hover { color: #fff; border-color: #fff; box-shadow: 0 0 15px rgba(255,255,255,0.5); }
+.active { background: rgba(0,245,255,0.1); color: #00F5FF; box-shadow: 0 0 15px rgba(0,245,255,0.6); }
+
+#desc-text { position: fixed; bottom: 30px; width: 100%; text-align: center; z-index: 100; font-size: 16px; font-weight: bold; letter-spacing: 2px; text-shadow: 0 2px 5px #000; color: #00F5FF; transition: all 0.4s;}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="vignette"></div>
+
+<div id="ui-panel">
+    <div id="boss-name">PROTOCOLE CHRONOS</div>
+    <div class="row">
+        <button class="btn active" id="btn-1" onclick="setPhase(1)">PH1: LE SAGE</button>
+        <button class="btn" id="btn-2" onclick="setPhase(2)">PH2: LE PSYCHOPATHE</button>
+        <button class="btn" id="btn-3" onclick="setPhase(3)">PH3: LE DÉCHIREUR</button>
+    </div>
+</div>
+
+<div id="desc-text">VITESSE x2.0 — LE SEIGNEUR DU TEMPS TISSE LA RÉALITÉ.</div>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURATION DU CANVAS & VARIABLES GLOBALES
+// ═══════════════════════════════════════════════════════════
+const cv = document.getElementById('c'), cx = cv.getContext('2d', {alpha: false});
+let W, H;
+let currentPhase = 1;
+
+// VARIABLES GLOBALES (Correction du bug mx/my)
+let mx = window.innerWidth / 2, my = window.innerHeight / 2;
+
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+
+let timeSand = [];
+
+function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
+window.addEventListener('resize', resize); resize();
+window.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+
+// Données de configuration des phases
+const phasesData = {
+    1: { color: '#00F5FF', desc: "VITESSE x2.0 — LE SEIGNEUR DU TEMPS TISSE LA RÉALITÉ." },
+    2: { color: '#FF10F0', desc: "INVERSION DU FLUX — L'ESPRIT SE FRACTURE." },
+    3: { color: '#FF003C', desc: "RÉALITÉ DISTORDUE — LE TEMPS S'EFFONDRE." }
+};
+
+function setPhase(p) {
+    currentPhase = p;
+    document.getElementById('btn-1').classList.remove('active');
+    document.getElementById('btn-2').classList.remove('active');
+    document.getElementById('btn-3').classList.remove('active');
+    document.getElementById('btn-'+p).classList.add('active');
+
+    const data = phasesData[p];
+    document.getElementById('ui-panel').style.borderColor = data.color;
+    document.getElementById('ui-panel').style.boxShadow = `0 0 20px ${data.color}66`;
+    document.getElementById('boss-name').style.color = data.color;
+    document.getElementById('boss-name').style.textShadow = `0 0 15px ${data.color}`;
+    document.getElementById('desc-text').style.color = data.color;
+    document.getElementById('desc-text').textContent = data.desc;
+
+    document.querySelectorAll('.btn').forEach(btn => {
+        btn.style.borderColor = data.color;
+        if(btn.classList.contains('active')) {
+            btn.style.color = p === 3 ? '#fff' : data.color;
+            btn.style.background = `rgba(${p===1?'0,245,255':(p===2?'255,16,240':'255,0,60')}, 0.2)`;
+            btn.style.boxShadow = `0 0 15px ${data.color}99`;
+        } else {
+            btn.style.color = '#aaa';
+            btn.style.background = 'transparent';
+            btn.style.boxShadow = 'none';
+        }
+    });
+
+    timeSand = []; 
+}
+setPhase(1);
+
+// ═══════════════════════════════════════════════════════════
+//  BOUCLE DE RENDU PRINCIPALE
+// ═══════════════════════════════════════════════════════════
+let tT = 0, lastT = 0;
+
+function draw(ts) {
+    const dt = Math.min(ts - lastT, 50) || 0; 
+    lastT = ts; tT += dt;
+
+    const t = tT / 1000;
+    const centerX = W / 2;
+    const centerY = H / 2 + 20;
+
+    if (currentPhase === 1) {
+        // ═══════════════════════════════════════════════════════════
+        //  PHASE 1: LE SEIGNEUR DU TEMPS (Majestueux, Sage)
+        // ═══════════════════════════════════════════════════════════
+        const mainCol = '#00F5FF'; const secCol = '#FFD700'; const speedT = t * 2.0;
+
+        cx.fillStyle = 'rgba(2, 5, 12, 0.35)'; cx.fillRect(0, 0, W, H);
+        cx.save(); cx.translate(centerX, centerY); cx.rotate(speedT * 0.1);
+        glow(mainCol, 15); cx.strokeStyle = mainCol; cx.globalAlpha = 0.05; cx.lineWidth = 2;
+        for(let r = 100; r <= W; r += 150) { cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI*2); cx.stroke(); }
+        for(let i = 0; i < 12; i++) { cx.beginPath(); cx.moveTo(0,0); cx.lineTo(Math.cos(i*Math.PI/6)*W, Math.sin(i*Math.PI/6)*W); cx.stroke(); }
+        cx.restore(); cx.globalAlpha = 1; noGlow();
+
+        if(Math.random() < 0.8) timeSand.push({ x: centerX + (Math.random()-0.5)*W*0.8, y: -50, vy: Math.random()*8+4, size: Math.random()*2+1, life: 1, c: secCol });
+        cx.globalCompositeOperation = 'screen';
+        for(let i = timeSand.length-1; i>=0; i--) {
+            let p = timeSand[i]; p.y += p.vy; p.life++;
+            glow(p.c, 15); cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, p.size, 0, Math.PI*2); cx.fill();
+            if(p.y > H + 50) timeSand.splice(i, 1);
+        }
+        cx.globalCompositeOperation = 'source-over'; noGlow();
+
+        cx.save(); const breathe = Math.sin(t * 2) * 15; cx.translate(centerX, centerY - 20 + breathe); cx.scale(1.2, 1.2); 
+
+        cx.save(); cx.translate(0, -60);
+        cx.save(); cx.rotate(speedT * 0.2); glow(secCol, 20); cx.strokeStyle = secCol; cx.lineWidth = 2; cx.beginPath(); cx.arc(0, 0, 180, 0, Math.PI*2); cx.stroke();
+        for(let i=0; i<16; i++) { cx.rotate(Math.PI/8); cx.fillStyle = secCol; cx.fillRect(170, -2, 20, 4); }
+        cx.restore(); cx.save(); cx.rotate(-speedT * 0.4); glow(mainCol, 15); cx.strokeStyle = mainCol; cx.lineWidth = 6; cx.setLineDash([20, 30]);
+        cx.beginPath(); cx.arc(0, 0, 140, 0, Math.PI*2); cx.stroke(); cx.setLineDash([]); cx.restore(); cx.restore();
+
+        noGlow(); cx.fillStyle = '#05020a'; cx.strokeStyle = mainCol; cx.lineWidth = 3;
+        cx.beginPath(); cx.moveTo(-90, -80); cx.lineTo(90, -80); cx.lineTo(120, -30); cx.lineTo(60, -20); cx.lineTo(0, -50); cx.lineTo(-60, -20); cx.lineTo(-120, -30); cx.closePath(); cx.fill(); cx.stroke();
+        cx.beginPath(); const drapeSway = Math.sin(t * 3) * 10; cx.moveTo(-60, 40); cx.lineTo(60, 40); cx.lineTo(80 + drapeSway, 180); cx.lineTo(0, 220); cx.lineTo(-80 + drapeSway, 180); cx.closePath(); cx.fill(); cx.stroke();
+
+        const drawArm = (isLeft) => {
+            const side = isLeft ? -1 : 1; cx.save(); cx.translate(side * 80, -60);
+            const armSwing = Math.sin(t * 2 + (isLeft ? 0 : Math.PI)) * 0.1; cx.rotate(side * -0.4 + armSwing);
+            glow(mainCol, 10); cx.strokeStyle = '#111'; cx.lineWidth = 14; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 70); cx.stroke();
+            cx.translate(0, 70); glow(secCol, 15); cx.fillStyle = secCol; cx.beginPath(); cx.arc(0, 0, 10, 0, Math.PI*2); cx.fill(); noGlow();
+            cx.rotate(side * 0.8); cx.strokeStyle = '#111'; cx.lineWidth = 10; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 60); cx.stroke();
+            cx.translate(0, 70); glow(mainCol, 30); cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 8 + Math.sin(t*10)*3, 0, Math.PI*2); cx.fill();
+            cx.rotate(speedT); cx.strokeStyle = mainCol; cx.lineWidth = 2; cx.beginPath(); cx.arc(0, 0, 25, 0, Math.PI*2); cx.stroke();
+            for(let i=0;i<4;i++){ cx.rotate(Math.PI/2); cx.fillRect(20, -1, 10, 2); } cx.restore();
+        };
+        drawArm(true); drawArm(false); 
+
+        cx.save(); cx.translate(0, -10); 
+        glow(mainCol, 20); cx.fillStyle = '#020005'; cx.strokeStyle = mainCol; cx.lineWidth = 4; cx.beginPath(); cx.arc(0, 0, 60, 0, Math.PI*2); cx.fill(); cx.stroke();
+        glow(secCol, 30); cx.fillStyle = `rgba(255, 215, 0, 0.15)`; cx.beginPath(); cx.arc(0, 0, 45, 0, Math.PI*2); cx.fill();
+        noGlow(); cx.fillStyle = secCol; for(let i=0; i<12; i++) { cx.save(); cx.rotate(i * Math.PI/6); cx.fillRect(-2, -55, 4, 10); cx.restore(); }
+        cx.save(); cx.rotate(speedT * 2.0); glow(mainCol, 15); cx.fillStyle = '#fff'; cx.strokeStyle = mainCol; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(-4, 10); cx.lineTo(4, 10); cx.lineTo(0, -75); cx.closePath(); cx.fill(); cx.stroke(); cx.restore();
+        cx.save(); cx.rotate(speedT * 0.3 + Math.PI/4); glow(secCol, 15); cx.fillStyle = '#111'; cx.strokeStyle = secCol; cx.lineWidth = 3; cx.beginPath(); cx.moveTo(-8, 15); cx.lineTo(8, 15); cx.lineTo(15, -10); cx.lineTo(0, -50); cx.lineTo(-15, -10); cx.closePath(); cx.fill(); cx.stroke();
+        cx.fillStyle = secCol; cx.beginPath(); cx.arc(0, -15, 5, 0, Math.PI*2); cx.fill(); cx.restore();
+        cx.fillStyle = '#fff'; glow('#fff', 20); cx.beginPath(); cx.arc(0, 0, 8, 0, Math.PI*2); cx.fill(); cx.restore(); 
+
+        cx.save(); cx.translate(0, -90); 
+        noGlow(); cx.fillStyle = '#05020a'; cx.strokeStyle = secCol; cx.lineWidth = 2;
+        cx.beginPath(); cx.moveTo(-30, 10); cx.lineTo(-45, -40); cx.lineTo(-15, -80); cx.lineTo(0, -90); cx.lineTo(15, -80); cx.lineTo(45, -40); cx.lineTo(30, 10); cx.closePath(); cx.fill(); cx.stroke();
+        cx.fillStyle = '#000'; cx.beginPath(); cx.moveTo(-25, -30); cx.lineTo(0, -60); cx.lineTo(25, -30); cx.lineTo(0, 10); cx.closePath(); cx.fill();
+        glow(mainCol, 25); cx.fillStyle = '#fff'; cx.beginPath(); cx.ellipse(0, -45, 3, 8, 0, 0, Math.PI*2); cx.fill(); cx.beginPath(); cx.ellipse(-12, -30, 8, 2, 0, 0, Math.PI*2); cx.fill(); cx.beginPath(); cx.ellipse(12, -30, 8, 2, 0, 0, Math.PI*2); cx.fill();
+        cx.globalCompositeOperation = 'screen'; glow(secCol, 15); cx.strokeStyle = `rgba(255, 215, 0, 0.6)`; cx.lineWidth = 2;
+        for(let i=0; i<5; i++) { cx.beginPath(); const startX = (i - 2) * 6; cx.moveTo(startX, 0); const beardLen = 30 + Math.cos(i)*10; const sway = Math.sin(t*2 + i)*5; cx.quadraticCurveTo(startX + sway, beardLen/2, startX*1.5 + sway, beardLen); cx.stroke(); }
+        cx.globalCompositeOperation = 'source-over'; cx.restore(); cx.restore(); 
+
+    } else if (currentPhase === 2) {
+        // ═══════════════════════════════════════════════════════════
+        //  PHASE 2: LE PSYCHOPATHE (Rewind, Fracturé, Violet)
+        // ═══════════════════════════════════════════════════════════
+        const mainCol = '#FF10F0'; const secCol = '#8A2BE2'; const revT = -t * 1.5;
+        
+        cx.fillStyle = 'rgba(10, 0, 15, 0.4)'; cx.fillRect(0, 0, W, H);
+        cx.save(); cx.translate(centerX, centerY); cx.rotate(revT * 0.1);
+        glow(mainCol, 15); cx.strokeStyle = secCol; cx.globalAlpha = 0.05; cx.lineWidth = 2;
+        for(let r = 100; r <= W; r += 150) { cx.beginPath(); cx.arc(0, 0, r, 0, Math.PI*2); cx.stroke(); }
+        for(let i = 0; i < 12; i++) { cx.beginPath(); cx.moveTo(0,0); cx.lineTo(Math.cos(i*Math.PI/6)*W, Math.sin(i*Math.PI/6)*W); cx.stroke(); }
+        cx.restore(); cx.globalAlpha = 1; noGlow();
+
+        if(Math.random() < 0.8) timeSand.push({ x: centerX + (Math.random()-0.5)*W*0.8, y: H + 50, vy: -Math.random()*6 - 3, size: Math.random()*2+2, life: 1, c: mainCol });
+        cx.globalCompositeOperation = 'screen';
+        for(let i = timeSand.length-1; i>=0; i--) {
+            let p = timeSand[i]; p.y += p.vy; p.life++;
+            glow(p.c, 15); cx.fillStyle = p.c; cx.beginPath(); cx.arc(p.x, p.y, p.size, 0, Math.PI*2); cx.fill();
+            if(p.y < -50) timeSand.splice(i, 1);
+        }
+        cx.globalCompositeOperation = 'source-over'; noGlow();
+
+        const drawPsychoChronos = (x, y, localT, alpha, isGhost) => {
+            cx.save(); const twitchX = isGhost ? 0 : (Math.random()-0.5) * 6; const twitchY = isGhost ? 0 : (Math.random()-0.5) * 6;
+            cx.translate(x + twitchX, y + 20 + twitchY); cx.scale(1.2, 1.2); cx.globalAlpha = alpha;
+
+            cx.save(); cx.translate(0, -40); cx.save(); cx.rotate(localT * 0.4); glow(mainCol, 20); cx.strokeStyle = mainCol; cx.lineWidth = 4;
+            cx.setLineDash([30, 20, 5, 20]); cx.beginPath(); cx.arc(0, 0, 180, 0, Math.PI*2); cx.stroke(); cx.setLineDash([]); cx.restore();
+            cx.save(); cx.rotate(-localT * 0.8); glow(secCol, 15); cx.strokeStyle = secCol; cx.lineWidth = 10; cx.setLineDash([10, 40]);
+            cx.beginPath(); cx.arc(0, 0, 140, 0, Math.PI*2); cx.stroke(); cx.setLineDash([]); cx.restore(); cx.restore();
+
+            noGlow(); cx.fillStyle = isGhost ? 'transparent' : '#050005'; cx.strokeStyle = secCol; cx.lineWidth = 3;
+            cx.beginPath(); cx.moveTo(-80, -60); cx.lineTo(80, -60); cx.lineTo(100, -10); cx.lineTo(40, 0); cx.lineTo(0, -30); cx.lineTo(-40, 0); cx.lineTo(-100, -10); cx.closePath(); cx.fill(); cx.stroke();
+            cx.beginPath(); const chaoticSway = Math.sin(localT * 10) * 15; cx.moveTo(-50, 40); cx.lineTo(50, 40); cx.lineTo(90 + chaoticSway, 120); cx.lineTo(40, 100); cx.lineTo(10 - chaoticSway, 190); cx.lineTo(-20, 110); cx.lineTo(-70 + chaoticSway, 160); cx.closePath(); cx.fill(); cx.stroke();
+
+            const drawPsychoArm = (isLeft) => {
+                const side = isLeft ? -1 : 1; cx.save(); cx.translate(side * 70, -40);
+                const armTwitch = Math.sin(localT * (isLeft ? 8 : 12)) * 0.4; cx.rotate(side * -0.8 + armTwitch);
+                glow(secCol, 10); cx.strokeStyle = '#111'; cx.lineWidth = 10; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(side*20, 60); cx.stroke();
+                cx.translate(side*20, 60); glow(mainCol, 15); cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 8, 0, Math.PI*2); cx.fill(); noGlow();
+                cx.rotate(side * 1.5 + Math.sin(localT*15)*0.2); cx.strokeStyle = '#111'; cx.lineWidth = 8; cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, 70); cx.stroke();
+                cx.translate(0, 70); glow(mainCol, 20); cx.strokeStyle = mainCol; cx.lineWidth = 3;
+                cx.beginPath(); cx.moveTo(0,0); cx.lineTo(-15, 30); cx.stroke(); cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0, 40); cx.stroke(); cx.beginPath(); cx.moveTo(0,0); cx.lineTo(15, 30); cx.stroke(); cx.restore();
+            };
+            drawPsychoArm(true); drawPsychoArm(false);
+
+            cx.save(); cx.translate(0, -10); glow(secCol, 20); cx.fillStyle = isGhost ? 'transparent' : '#050005'; cx.strokeStyle = mainCol; cx.lineWidth = 4;
+            cx.beginPath(); for(let i=0; i<Math.PI*2; i+=0.5) { let r = 55 + Math.random()*10; if(i===0) cx.moveTo(Math.cos(i)*r, Math.sin(i)*r); else cx.lineTo(Math.cos(i)*r, Math.sin(i)*r); } cx.closePath(); cx.fill(); cx.stroke();
+            cx.save(); cx.rotate(localT * 8.0); glow(mainCol, 15); cx.fillStyle = mainCol; cx.beginPath(); cx.moveTo(-2, 10); cx.lineTo(2, 10); cx.lineTo(0, -65); cx.closePath(); cx.fill(); cx.restore();
+            cx.save(); cx.rotate(localT * 3.5 + Math.PI); glow(mainCol, 15); cx.fillStyle = '#fff'; cx.beginPath(); cx.moveTo(-4, 15); cx.lineTo(4, 15); cx.lineTo(0, -45); cx.closePath(); cx.fill(); cx.restore();
+            cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 6, 0, Math.PI*2); cx.fill(); cx.restore(); 
+
+            cx.save(); cx.translate(0, -70); noGlow(); cx.fillStyle = isGhost ? 'transparent' : '#05000a'; cx.strokeStyle = mainCol; cx.lineWidth = 2;
+            cx.beginPath(); cx.moveTo(-25, 10); cx.lineTo(-40, -20); cx.lineTo(-20, -70); cx.lineTo(10, -60); cx.lineTo(35, -30); cx.lineTo(20, 10); cx.closePath(); cx.fill(); cx.stroke();
+            cx.fillStyle = '#000'; cx.beginPath(); cx.moveTo(-20, -20); cx.lineTo(-5, -50); cx.lineTo(15, -25); cx.lineTo(0, 5); cx.closePath(); cx.fill();
+            glow(mainCol, 30); cx.fillStyle = '#fff'; const eyeTwitch = Math.sin(localT * 20) * 3; cx.beginPath(); cx.arc(-5 + eyeTwitch, -35, 12, 0, Math.PI*2); cx.fill();
+            cx.fillStyle = '#000'; noGlow(); cx.beginPath(); cx.arc(-5 + eyeTwitch, -35, 3, 0, Math.PI*2); cx.fill();
+            glow(mainCol, 15); cx.strokeStyle = mainCol; cx.lineWidth = 2; cx.beginPath(); cx.moveTo(-20, -10); cx.lineTo(-10, -5); cx.lineTo(-5, -15); cx.lineTo(5, -5); cx.lineTo(15, -15); cx.lineTo(20, -5); cx.stroke();
+            cx.restore(); cx.restore(); 
+        };
+
+        for(let i=3; i>=1; i--) { let ghostTime = revT - (i * 0.15); let ghostX = centerX + Math.sin(ghostTime*5) * 40; drawPsychoChronos(ghostX, centerY, ghostTime, 0.3 - (i*0.08), true); }
+        const realX = centerX + Math.sin(revT*5) * 40; drawPsychoChronos(realX, centerY, revT, 1, false);
+
+    } else if (currentPhase === 3) {
+        // ═══════════════════════════════════════════════════════════
+        //  PHASE 3: LE DÉCHIREUR (Temps distordu, avance/recule/saute, Rouge Pur)
+        // ═══════════════════════════════════════════════════════════
+        const mainCol = '#FF003C'; 
+        
+        // 1. LA DISTORSION TEMPORELLE (Le Temps se casse)
+        // Le temps avance, fait de grands retours en arrière (Math.sin), et subit des sauts brutaux (glitchBreak).
+        let timeBreak = (Math.random() < 0.15) ? (Math.random() - 0.5) * 4 : 0;
+        let distT = t + Math.sin(t * 4) * 1.5 + timeBreak; 
+        
+        // 2. FOND : Le monde s'effondre (Tremblements et Noir Absolu)
+        cx.fillStyle = '#030001';
+        cx.fillRect(0, 0, W, H);
+
+        cx.save();
+        // Énorme tremblement d'écran constant
+        cx.translate((Math.random()-0.5)*12, (Math.random()-0.5)*12);
+
+        // Grille qui palpite et se déforme (plus de cercles parfaits)
+        cx.save(); cx.translate(centerX, centerY); cx.rotate(distT * 0.1);
+        cx.strokeStyle = 'rgba(255, 0, 60, 0.15)'; cx.lineWidth = 2;
+        for(let r = 100; r <= W; r += 150) { 
+            cx.beginPath(); 
+            // Déformation radiale (les cercles deviennent des taches organiques instables)
+            for(let a=0; a<=Math.PI*2; a+=0.1) {
+                let warp = Math.sin(distT * 10 + a * 5 + r) * 20;
+                if(a===0) cx.moveTo(Math.cos(a)*(r+warp), Math.sin(a)*(r+warp));
+                else cx.lineTo(Math.cos(a)*(r+warp), Math.sin(a)*(r+warp));
+            }
+            cx.closePath(); cx.stroke(); 
+        }
+        cx.restore();
+
+        // Particules : Débris de temps (Rouge) qui tombent massivement et de manière chaotique
+        if(Math.random() < 0.6) timeSand.push({ x: Math.random()*W, y: -50, vy: Math.random()*20+5, size: Math.random()*4+2, life: 1, c: mainCol });
+        cx.globalCompositeOperation = 'screen';
+        for(let i = timeSand.length-1; i>=0; i--) {
+            let p = timeSand[i]; p.y += p.vy; p.life++;
+            glow(p.c, 15); cx.fillStyle = p.c; 
+            // Tremblement des particules elles-mêmes
+            cx.fillRect(p.x + (Math.random()-0.5)*10, p.y, p.size, p.size*3);
+            if(p.y > H + 50) timeSand.splice(i, 1);
+        }
+        cx.globalCompositeOperation = 'source-over'; noGlow();
+
+        // 3. LES DÉCHIRURES TEMPORELLES (Arrachage de la réalité)
+        cx.globalCompositeOperation = 'screen';
+        glow(mainCol, 40); cx.strokeStyle = mainCol; cx.fillStyle = 'rgba(255, 0, 60, 0.2)';
+        
+        for(let i=0; i<3; i++) { // Moins de failles, mais plus grosses et erratiques
+            cx.save();
+            cx.translate(centerX, centerY - 60);
+            const riftAngle = (i * Math.PI*2/3) + Math.PI/2 + Math.sin(distT + i)*0.5;
+            cx.rotate(riftAngle);
+
+            cx.beginPath();
+            cx.moveTo(100, 0); // Démarre près du boss
+            let currX = 100, currY = 0;
+            
+            // Faille hyper chaotique (lié au temps distordu)
+            for(let j=0; j<6; j++) {
+                currX += 100 + Math.random()*150;
+                currY += (Math.random() - 0.5) * 150;
+                cx.lineTo(currX, currY);
+            }
+            for(let j=0; j<6; j++) {
+                currX -= 100 + Math.random()*50;
+                currY += (Math.random() - 0.5) * 80;
+                cx.lineTo(currX, currY + 15 + Math.random()*30); // Grosse épaisseur
+            }
+            cx.closePath();
+            cx.lineWidth = 4 + Math.random()*4;
+            cx.fill(); cx.stroke();
+            
+            // Éclairs à l'intérieur
+            cx.beginPath(); cx.moveTo(100, 0); cx.lineTo(300, (Math.random()-0.5)*100); cx.lineTo(800, (Math.random()-0.5)*200);
+            cx.strokeStyle = '#fff'; cx.lineWidth = 2; cx.stroke();
+            cx.restore();
+        }
+        cx.globalCompositeOperation = 'source-over'; noGlow();
+
+        // 4. LE BOSS CHRONOS (Qui subit son propre temps distordu)
+        cx.save();
+        cx.translate(centerX, centerY - 20);
+        cx.scale(1.3, 1.3); // Encore plus imposant
+
+        // HALO DÉTRUIT (Tourne de manière folle à cause de distT)
+        cx.save(); cx.translate(0, -40); cx.rotate(distT * 1.5); // Tourne beaucoup trop vite
+        glow(mainCol, 30); cx.strokeStyle = mainCol; cx.lineWidth = 5;
+        cx.beginPath(); cx.arc(0, 0, 180, 0, Math.PI*1.3); cx.stroke(); // Il manque un gros bout du halo
+        cx.restore();
+
+        // MANTEAU
+        noGlow(); cx.fillStyle = '#050002'; cx.strokeStyle = mainCol; cx.lineWidth = 3;
+        cx.beginPath(); cx.moveTo(-80, -60); cx.lineTo(80, -60); cx.lineTo(100, -10); cx.lineTo(40, 0); cx.lineTo(0, -30); cx.lineTo(-40, 0); cx.lineTo(-100, -10); cx.closePath(); cx.fill(); cx.stroke();
+        
+        // Pagne qui s'agite frénétiquement
+        cx.beginPath(); 
+        let psychoSway = Math.sin(distT * 15) * 30;
+        cx.moveTo(-50, 40); cx.lineTo(50, 40); cx.lineTo(90 + psychoSway, 120); cx.lineTo(40, 100); cx.lineTo(10 - psychoSway, 190); cx.lineTo(-20, 110); cx.lineTo(-70 + psychoSway, 160); cx.closePath(); cx.fill(); cx.stroke();
+
+        // BRAS ARRACHEURS (Mouvements saccadés et violents)
+        const drawTearArm = (isLeft) => {
+            const side = isLeft ? -1 : 1;
+            cx.save(); cx.translate(side * 70, -40);
+            
+            // Les bras s'écartent et se rapprochent violemment (Tire sur la réalité)
+            const pullMotion = Math.sin(distT * 5) * 0.5;
+            cx.rotate(side * -1.2 + pullMotion); 
+
+            glow(mainCol, 15); cx.strokeStyle = '#111'; cx.lineWidth = 14;
+            cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -80); cx.stroke(); 
+            
+            cx.translate(0, -80);
+            glow(mainCol, 20); cx.fillStyle = mainCol; cx.beginPath(); cx.arc(0, 0, 12, 0, Math.PI*2); cx.fill(); noGlow();
+
+            cx.rotate(side * 0.5 - pullMotion * 1.5);
+            cx.strokeStyle = '#111'; cx.lineWidth = 12;
+            cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(0, -70); cx.stroke();
+
+            // Mains crispées
+            cx.translate(0, -70);
+            glow(mainCol, 30); cx.strokeStyle = mainCol; cx.lineWidth = 5;
+            cx.beginPath(); cx.moveTo(0,0); cx.lineTo(-25, -35); cx.stroke();
+            cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0, -45); cx.stroke();
+            cx.beginPath(); cx.moveTo(0,0); cx.lineTo(25, -35); cx.stroke();
+            cx.restore();
+        };
+        drawTearArm(true); drawTearArm(false);
+
+        // THORAX (Horloge sanglante qui bug)
+        cx.save(); cx.translate(0, -10); 
+        glow(mainCol, 40); cx.fillStyle = '#050002'; cx.strokeStyle = mainCol; cx.lineWidth = 5;
+        cx.beginPath(); cx.arc(0, 0, 60, 0, Math.PI*2); cx.fill(); cx.stroke();
+
+        // Aiguilles bloquées mais qui tremblent
+        const bugTwitch = Math.sin(distT * 50) * 0.2; // Tremblement infini
+        cx.save(); cx.rotate(Math.PI*0.8 + bugTwitch);
+        glow(mainCol, 20); cx.fillStyle = mainCol;
+        cx.beginPath(); cx.moveTo(-4, 10); cx.lineTo(4, 10); cx.lineTo(0, -70); cx.closePath(); cx.fill(); cx.restore();
+        
+        cx.save(); cx.rotate(-Math.PI*0.3 - bugTwitch*1.5);
+        cx.beginPath(); cx.moveTo(-3, 10); cx.lineTo(3, 10); cx.lineTo(0, -50); cx.closePath(); cx.fill(); cx.restore();
+        
+        cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(0, 0, 8, 0, Math.PI*2); cx.fill();
+        
+        // Sang numérique (S'écoule à chaque "Saut" temporel)
+        cx.fillStyle = mainCol;
+        cx.fillRect(-10, 20 + Math.random()*5, 4, 60);
+        cx.fillRect(5, 30 + Math.random()*5, 3, 40);
+        cx.restore(); 
+
+        // LA TÊTE (Hurlement au ciel)
+        cx.save(); cx.translate(0, -70); 
+        // La tête est relevée en arrière (agonie/rage)
+        cx.rotate(-Math.PI*0.15 + Math.sin(distT*8)*0.1); 
+
+        noGlow(); cx.fillStyle = '#050002'; cx.strokeStyle = mainCol; cx.lineWidth = 2;
+        cx.beginPath(); cx.moveTo(-25, 10); cx.lineTo(-40, -20); cx.lineTo(-10, -70); cx.lineTo(30, -60); cx.lineTo(40, -20); cx.lineTo(25, 10); cx.closePath(); cx.fill(); cx.stroke();
+        
+        // Bouche ouverte énorme
+        cx.fillStyle = '#000';
+        cx.beginPath(); cx.moveTo(-15, -15); cx.lineTo(-5, -50); cx.lineTo(20, -20); cx.lineTo(5, 10); cx.closePath(); cx.fill(); 
+
+        // Yeux glitchés
+        glow(mainCol, 40); cx.fillStyle = '#fff';
+        cx.beginPath(); cx.ellipse(-5, -45, 6, 2, Math.PI/4, 0, Math.PI*2); cx.fill();
+        cx.beginPath(); cx.ellipse(15, -35, 8, 3, -Math.PI/6, 0, Math.PI*2); cx.fill();
+        
+        cx.restore(); // Fin Tête
+        cx.restore(); // Fin Boss
+
+        cx.restore(); // Fin du Tremblement Global
+    }
+
+    requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>

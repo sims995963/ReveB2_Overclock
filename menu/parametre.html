@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ReveB 2 — PARAMÈTRES SYSTÈME</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --cyan: #00F5FF;
+      --red: #FF003C;
+      --purple: #8A2BE2;
+      --green: #00FF41;
+      --gold: #FFD700;
+      --bg-dark: #010005;
+      --font-ui: 'Orbitron', sans-serif;
+      --font-term: 'Share Tech Mono', monospace;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--cyan);
+      font-family: var(--font-term);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+    }
+
+    body.visible {
+      opacity: 1;
+    }
+
+    #crt {
+      position: fixed;
+      inset: 0;
+      z-index: 999;
+      pointer-events: none;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, .15) 50%),
+        linear-gradient(90deg, rgba(0, 245, 255, .02), rgba(255, 0, 60, .02), rgba(138, 43, 226, .02));
+      background-size: 100% 3px, 3px 100%;
+      opacity: 0.8;
+      transition: opacity 0.3s;
+    }
+
+    #vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 998;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.9) 100%);
+      transition: opacity 0.3s;
+    }
+
+    #bg-grid {
+      position: absolute;
+      inset: -50%;
+      z-index: 0;
+      background-image:
+        linear-gradient(rgba(0, 245, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 245, 255, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+      transform: perspective(500px) rotateX(60deg) translateY(-100px) translateZ(-200px);
+      animation: gridMove 10s linear infinite;
+      transition: opacity 0.3s;
+    }
+
+    @keyframes gridMove {
+      from {
+        transform: perspective(500px) rotateX(60deg) translateY(0) translateZ(-200px);
+      }
+
+      to {
+        transform: perspective(500px) rotateX(60deg) translateY(40px) translateZ(-200px);
+      }
+    }
+
+    #scanline {
+      position: fixed;
+      inset: 0;
+      z-index: 997;
+      pointer-events: none;
+      background: linear-gradient(transparent 50%, rgba(0, 245, 255, 0.015) 50%);
+      background-size: 100% 4px;
+      animation: scanMove 8s linear infinite;
+      transition: opacity 0.3s;
+    }
+
+    @keyframes scanMove {
+      from {
+        background-position: 0 0;
+      }
+
+      to {
+        background-position: 0 100vh;
+      }
+    }
+
+    /* LAYOUT */
+    #ui-wrapper {
+      position: relative;
+      z-index: 10;
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 0;
+      padding: 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    /* HEADER */
+    #header {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: flex-end;
+      gap: 30px;
+      margin-bottom: 35px;
+      border-bottom: 1px solid rgba(0, 245, 255, 0.2);
+      padding-bottom: 20px;
+    }
+
+    .back-btn {
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: rgba(0, 245, 255, 0.5);
+      cursor: pointer;
+      border: 1px solid rgba(0, 245, 255, 0.2);
+      padding: 8px 15px;
+      transition: all 0.2s;
+      white-space: nowrap;
+      align-self: center;
+    }
+
+    .back-btn:hover {
+      color: var(--cyan);
+      border-color: var(--cyan);
+      background: rgba(0, 245, 255, 0.05);
+      box-shadow: 0 0 15px rgba(0, 245, 255, 0.3);
+    }
+
+    .page-title {
+      font-family: var(--font-ui);
+      font-size: 2.5rem;
+      font-weight: 900;
+      letter-spacing: 12px;
+      text-shadow: 0 0 20px var(--cyan);
+    }
+
+    .page-subtitle {
+      font-size: 0.75rem;
+      color: rgba(0, 245, 255, 0.4);
+      letter-spacing: 3px;
+      align-self: flex-end;
+      margin-bottom: 4px;
+    }
+
+    /* NAV SIDEBAR */
+    #cat-nav {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      padding-right: 30px;
+      border-right: 1px solid rgba(0, 245, 255, 0.15);
+    }
+
+    .cat-label {
+      font-size: 0.6rem;
+      color: rgba(0, 245, 255, 0.3);
+      letter-spacing: 3px;
+      margin-top: 15px;
+      margin-bottom: 5px;
+    }
+
+    .cat-btn {
+      font-family: var(--font-term);
+      font-size: 0.8rem;
+      color: rgba(0, 245, 255, 0.5);
+      padding: 8px 12px;
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all 0.2s;
+      letter-spacing: 1px;
+    }
+
+    .cat-btn::before {
+      content: '> ';
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .cat-btn:hover,
+    .cat-btn.active {
+      color: var(--cyan);
+      border-left-color: var(--cyan);
+      background: rgba(0, 245, 255, 0.05);
+    }
+
+    .cat-btn.active::before {
+      opacity: 1;
+    }
+
+    /* SETTINGS PANEL */
+    #settings-panel {
+      padding-left: 40px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 245, 255, 0.2) transparent;
+    }
+
+    .settings-section {
+      display: none;
+    }
+
+    .settings-section.active {
+      display: block;
+    }
+
+    .section-head {
+      font-family: var(--font-ui);
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 5px;
+      color: var(--cyan);
+      margin-bottom: 25px;
+      text-shadow: 0 0 10px var(--cyan);
+    }
+
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 15px 0;
+      border-bottom: 1px solid rgba(0, 245, 255, 0.08);
+      gap: 20px;
+    }
+
+    .setting-info {
+      flex: 1;
+    }
+
+    .setting-label {
+      font-family: var(--font-ui);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 4px;
+    }
+
+    .setting-desc {
+      font-size: 0.68rem;
+      color: rgba(0, 245, 255, 0.4);
+      line-height: 1.5;
+    }
+
+    /* TOGGLE */
+    .toggle {
+      position: relative;
+      width: 52px;
+      height: 26px;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(0, 245, 255, 0.3);
+      transition: 0.3s;
+    }
+
+    .toggle-track::after {
+      content: '';
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      width: 18px;
+      height: 18px;
+      background: rgba(0, 245, 255, 0.4);
+      transition: 0.3s;
+    }
+
+    input:checked+.toggle-track {
+      background: rgba(0, 245, 255, 0.15);
+      border-color: var(--cyan);
+      box-shadow: 0 0 10px rgba(0, 245, 255, 0.3);
+    }
+
+    input:checked+.toggle-track::after {
+      transform: translateX(26px);
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+    }
+
+    /* SLIDER */
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 200px;
+      flex-shrink: 0;
+    }
+
+    .slider {
+      -webkit-appearance: none;
+      width: 150px;
+      height: 2px;
+      background: rgba(0, 245, 255, 0.2);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-size: 0.75rem;
+      color: var(--cyan);
+      width: 35px;
+      text-align: right;
+    }
+
+    /* SELECT */
+    .sys-select {
+      background: rgba(0, 10, 20, 0.8);
+      border: 1px solid rgba(0, 245, 255, 0.3);
+      color: var(--cyan);
+      font-family: var(--font-term);
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      padding: 6px 10px;
+      cursor: pointer;
+      outline: none;
+      min-width: 160px;
+    }
+
+    .sys-select option {
+      background: #010510;
+    }
+
+    /* KEYBIND */
+    .keybind-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .keybind-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border: 1px solid rgba(0, 245, 255, 0.1);
+      background: rgba(0, 10, 20, 0.5);
+    }
+
+    .keybind-name {
+      font-size: 0.7rem;
+      color: rgba(0, 245, 255, 0.6);
+    }
+
+    .keybind-key {
+      font-family: var(--font-ui);
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: var(--cyan);
+      border: 1px solid rgba(0, 245, 255, 0.4);
+      padding: 3px 8px;
+      letter-spacing: 1px;
+    }
+
+    /* DANGER ZONE */
+    .danger-btn {
+      display: inline-block;
+      margin-top: 10px;
+      font-family: var(--font-ui);
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: var(--red);
+      border: 1px solid rgba(255, 0, 60, 0.4);
+      border-left: 3px solid var(--red);
+      padding: 10px 20px;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .danger-btn:hover {
+      background: var(--red);
+      color: #000;
+      box-shadow: 0 0 20px rgba(255, 0, 60, 0.5);
+    }
+
+    /* FOOTER STATUS */
+    #footer {
+      grid-column: 1 / -1;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 15px;
+      border-top: 1px solid rgba(0, 245, 255, 0.1);
+      margin-top: 10px;
+    }
+
+    .status-msg {
+      font-size: 0.7rem;
+      color: var(--green);
+      letter-spacing: 2px;
+      height: 18px;
+      transition: color 0.3s;
+    }
+
+    .version-tag {
+      font-size: 0.65rem;
+      color: rgba(0, 245, 255, 0.2);
+      letter-spacing: 3px;
+    }
+
+    /* MODAL CONFIRM */
+    #modal-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(0, 0, 0, 0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #modal-overlay.show {
+      display: flex;
+    }
+
+    .modal-box {
+      border: 1px solid var(--red);
+      border-top: 3px solid var(--red);
+      background: #030008;
+      padding: 40px;
+      max-width: 500px;
+      text-align: center;
+      box-shadow: 0 0 60px rgba(255, 0, 60, 0.3);
+    }
+
+    .modal-title {
+      font-family: var(--font-ui);
+      font-size: 1.2rem;
+      font-weight: 900;
+      color: var(--red);
+      letter-spacing: 5px;
+      margin-bottom: 15px;
+      text-shadow: 0 0 15px var(--red);
+    }
+
+    .modal-text {
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.6);
+      line-height: 1.8;
+      margin-bottom: 30px;
+      white-space: pre-line;
+    }
+
+    .modal-btns {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+    }
+
+    .modal-btn {
+      font-family: var(--font-ui);
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 3px;
+      padding: 10px 25px;
+      cursor: pointer;
+      border: 1px solid;
+      transition: all 0.2s;
+    }
+
+    .modal-btn-cancel {
+      border-color: rgba(0, 245, 255, 0.4);
+      color: var(--cyan);
+    }
+
+    .modal-btn-cancel:hover {
+      background: rgba(0, 245, 255, 0.1);
+    }
+
+    .modal-btn-confirm {
+      border-color: var(--red);
+      color: var(--red);
+    }
+
+    .modal-btn-confirm:hover {
+      background: var(--red);
+      color: #000;
+      box-shadow: 0 0 20px rgba(255, 0, 60, 0.5);
+    }
+
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 245, 255, 0.2);
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="crt"></div>
+  <div id="vignette"></div>
+  <div id="scanline"></div>
+  <div id="bg-grid"></div>
+
+  <div id="ui-wrapper">
+
+    <!-- HEADER -->
+    <div id="header">
+      <div class="back-btn" onclick="goBack()">◄ RETOUR</div>
+      <div>
+        <div class="page-title">PARAMÈTRES</div>
+      </div>
+      <div class="page-subtitle">CONFIG_SYSTÈME // NOYAU v2.0.50</div>
+    </div>
+
+    <!-- SIDEBAR NAV -->
+    <div id="cat-nav">
+      <div class="cat-label">// AUDIO</div>
+      <div class="cat-btn active" onclick="showSection('audio', this)">MIXAGE SONORE</div>
+      <div class="cat-label">// VIDÉO</div>
+      <div class="cat-btn" onclick="showSection('video', this)">AFFICHAGE</div>
+      <div class="cat-btn" onclick="showSection('effets', this)">EFFETS CRT</div>
+      <div class="cat-label">// GAMEPLAY</div>
+      <div class="cat-btn" onclick="showSection('controles', this)">CONTRÔLES</div>
+      <div class="cat-btn" onclick="showSection('accessibilite', this)">ACCESSIBILITÉ</div>
+      <div class="cat-label">// SYSTÈME</div>
+      <div class="cat-btn" onclick="showSection('danger', this)">ZONE CRITIQUE</div>
+    </div>
+
+    <!-- PANEL SETTINGS -->
+    <div id="settings-panel">
+
+      <!-- AUDIO -->
+      <div id="sec-audio" class="settings-section active">
+        <div class="section-head">// MIXAGE SONORE</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">VOLUME PRINCIPAL</div>
+            <div class="setting-desc">Contrôle le volume global de la simulation.</div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" class="slider" id="vol-master" min="0" max="100" value="80"
+              oninput="updateSlider(this,'val-master'); applyAudio()">
+            <span class="slider-val" id="val-master">80%</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">EFFETS SONORES</div>
+            <div class="setting-desc">Sons de combat, impacts, et signaux système.</div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" class="slider" id="vol-sfx" min="0" max="100" value="75"
+              oninput="updateSlider(this,'val-sfx'); saveSettings()">
+            <span class="slider-val" id="val-sfx">75%</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">BANDE SONORE</div>
+            <div class="setting-desc">Musique de fond synthwave. Recommandé : maximum.</div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" class="slider" id="vol-music" min="0" max="100" value="65"
+              oninput="updateSlider(this,'val-music'); saveSettings()">
+            <span class="slider-val" id="val-music">65%</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">SONS SYSTÈME (MENUS)</div>
+            <div class="setting-desc">Bips et signaux de l'interface OS.</div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" class="slider" id="vol-ui" min="0" max="100" value="50"
+              oninput="updateSlider(this,'val-ui'); saveSettings()">
+            <span class="slider-val" id="val-ui">50%</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">MODE MUET</div>
+            <div class="setting-desc">Coupe toutes les sorties audio de la simulation.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-mute" onchange="applyAudio(); saveSettings()">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- VIDÉO -->
+      <div id="sec-video" class="settings-section">
+        <div class="section-head">// AFFICHAGE</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">RÉSOLUTION DE RENDU</div>
+            <div class="setting-desc">Résolution interne du moteur de rendu Canvas.</div>
+          </div>
+          <select class="sys-select" id="sel-res" onchange="saveSettings(); notify()">
+            <option value="1920x1080">1920x1080 [NATIF]</option>
+            <option value="1280x720">1280x720 [HD]</option>
+            <option value="2560x1440">2560x1440 [QHD]</option>
+            <option value="3840x2160">3840x2160 [4K]</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">FRÉQUENCE CIBLE</div>
+            <div class="setting-desc">Limite de FPS du moteur. ILLIMITÉ peut chauffer le système.</div>
+          </div>
+          <select class="sys-select" id="sel-fps" onchange="saveSettings(); notify()">
+            <option value="60">60 FPS</option>
+            <option value="120">120 FPS</option>
+            <option value="144">144 FPS</option>
+            <option value="0">ILLIMITÉ</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">LUMINOSITÉ</div>
+            <div class="setting-desc">Intensité lumineuse de la simulation. Attention aux yeux.</div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" class="slider" id="brightness" min="50" max="150" value="100"
+              oninput="updateSlider(this,'val-bright'); applyBrightness()">
+            <span class="slider-val" id="val-bright">100%</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">PLEIN ÉCRAN</div>
+            <div class="setting-desc">Mode immersif. Recommandé pour une expérience optimale.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-fs" onchange="toggleFullscreen()">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- EFFETS CRT -->
+      <div id="sec-effets" class="settings-section">
+        <div class="section-head">// EFFETS CRT & POST-PROCESS</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">LIGNES DE BALAYAGE CRT</div>
+            <div class="setting-desc">Simule l'effet d'un moniteur cathodique des années 80.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-crt" checked onchange="toggleCRT(this)">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">VIGNETTAGE</div>
+            <div class="setting-desc">Assombrit les bords de l'écran. Renforce l'immersion.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-vignette" checked onchange="toggleVignette(this)">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">LIGNE DE SCAN ANIMÉE</div>
+            <div class="setting-desc">Animation de balayage vertical sur l'interface.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-scan" checked onchange="toggleScanline(this)">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">INTENSITÉ DES GLITCHS</div>
+            <div class="setting-desc">Fréquence des distorsions visuelles lors des événements critiques.</div>
+          </div>
+          <select class="sys-select" id="sel-glitch" onchange="saveSettings(); notify()">
+            <option value="low">FAIBLE</option>
+            <option value="normal" selected>NORMAL</option>
+            <option value="moderate">MODÉRÉ</option>
+            <option value="intense">INTENSE</option>
+            <option value="chaos">CHAOS [DÉCONSEILLÉ]</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">ABERRATION CHROMATIQUE</div>
+            <div class="setting-desc">Décalage RGB lors des impacts et transitions.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-chroma" checked onchange="saveSettings(); notify()">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">GRILLE PERSPECTIVE (MENUS)</div>
+            <div class="setting-desc">Affiche la grille 3D dans les interfaces de navigation.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-grid" checked onchange="toggleGrid(this)">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- CONTRÔLES -->
+      <div id="sec-controles" class="settings-section">
+        <div class="section-head">// CONTRÔLES — CLAVIER</div>
+
+        <div class="setting-row" style="align-items:flex-start; flex-direction:column; gap:10px;">
+          <div class="setting-label">MAPPINGS DES TOUCHES</div>
+          <div class="setting-desc">Touches actives dans la simulation.</div>
+          <div class="keybind-grid">
+            <div class="keybind-row"><span class="keybind-name">DÉPLACEMENT HAUT</span><span class="keybind-key">Z /
+                ↑</span></div>
+            <div class="keybind-row"><span class="keybind-name">DÉPLACEMENT BAS</span><span class="keybind-key">S /
+                ↓</span></div>
+            <div class="keybind-row"><span class="keybind-name">DÉPLACEMENT GAUCHE</span><span class="keybind-key">Q /
+                ←</span></div>
+            <div class="keybind-row"><span class="keybind-name">DÉPLACEMENT DROIT</span><span class="keybind-key">D /
+                →</span></div>
+            <div class="keybind-row"><span class="keybind-name">TIRER</span><span class="keybind-key">CLIC G.</span>
+            </div>
+            <div class="keybind-row"><span class="keybind-name">DASH</span><span class="keybind-key">SHIFT</span></div>
+            <div class="keybind-row"><span class="keybind-name">INVISIBILITÉ</span><span class="keybind-key">C</span>
+            </div>
+            <div class="keybind-row"><span class="keybind-name">CLONE</span><span class="keybind-key">V</span></div>
+            <div class="keybind-row"><span class="keybind-name">SLOWMO</span><span class="keybind-key">X</span></div>
+            <div class="keybind-row"><span class="keybind-name">CAPACITÉ SPÉCIALE</span><span
+                class="keybind-key">E</span></div>
+            <div class="keybind-row"><span class="keybind-name">PAUSE</span><span class="keybind-key">ÉCHAP</span></div>
+            <div class="keybind-row"><span class="keybind-name">INTERAGIR</span><span class="keybind-key">F</span></div>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">SENSIBILITÉ VISÉE</div>
+            <div class="setting-desc">Vitesse de rotation de la visée à la souris.</div>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" class="slider" id="sens" min="1" max="10" value="5"
+              oninput="updateSlider(this,'val-sens'); saveSettings()">
+            <span class="slider-val" id="val-sens">5</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">VIBRATIONS MANETTE</div>
+            <div class="setting-desc">Retour haptique lors des impacts (si manette connectée).</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-rumble" checked onchange="saveSettings(); notify()">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- ACCESSIBILITÉ -->
+      <div id="sec-accessibilite" class="settings-section">
+        <div class="section-head">// ACCESSIBILITÉ</div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">MODE DALTONIEN</div>
+            <div class="setting-desc">Adapte la palette de couleurs pour les différentes formes de daltonisme.</div>
+          </div>
+          <select class="sys-select" id="sel-color" onchange="applyColorblind(); saveSettings()">
+            <option value="none">DÉSACTIVÉ</option>
+            <option value="protanopia">PROTANOPIE</option>
+            <option value="deuteranopia">DEUTÉRANOPIE</option>
+            <option value="tritanopia">TRITANOPIE</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">RÉDUIRE LES ANIMATIONS</div>
+            <div class="setting-desc">Limite les effets stroboscopiques. Recommandé si sensible à l'épilepsie.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-motion" onchange="applyReducedMotion(); saveSettings()">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">TAILLE DU TEXTE</div>
+            <div class="setting-desc">Agrandit les polices de l'interface et des dialogues.</div>
+          </div>
+          <select class="sys-select" id="sel-textsize" onchange="applyTextSize(); saveSettings()">
+            <option value="small">PETIT</option>
+            <option value="normal" selected>NORMAL</option>
+            <option value="large">GRAND</option>
+            <option value="xlarge">TRÈS GRAND</option>
+          </select>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">SOUS-TITRES</div>
+            <div class="setting-desc">Affiche les dialogues en texte. Obligatoire pour certains paliers.</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-sub" checked onchange="saveSettings(); notify()">
+            <div class="toggle-track"></div>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">LANGUE DE L'INTERFACE</div>
+            <div class="setting-desc">Langue des menus et des dialogues. Le lore reste en français.</div>
+          </div>
+          <select class="sys-select" id="sel-lang" onchange="saveSettings(); notify()">
+            <option value="fr" selected>FRANÇAIS [FR]</option>
+            <option value="en">ENGLISH [EN]</option>
+            <option value="es">ESPAÑOL [ES]</option>
+            <option value="de">DEUTSCH [DE]</option>
+            <option value="jp">日本語 [JP]</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ZONE CRITIQUE -->
+      <div id="sec-danger" class="settings-section">
+        <div class="section-head" style="color:var(--red); text-shadow: 0 0 10px var(--red);">// ZONE CRITIQUE — ACCÈS
+          RESTREINT</div>
+
+        <div
+          style="font-size:0.75rem; color:rgba(255,0,60,0.6); border:1px solid rgba(255,0,60,0.2); padding:15px; margin-bottom:25px; line-height:1.8;">
+          ⚠ ATTENTION : Les actions ci-dessous sont <strong style="color:var(--red)">IRRÉVERSIBLES</strong>.<br>
+          Toute suppression entraîne une perte permanente des données de simulation.<br>
+          Le N.E.A.N.T ne peut pas restaurer ce qui a été formaté.
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">RÉINITIALISER LES PARAMÈTRES</div>
+            <div class="setting-desc">Remet toutes les options à leur valeur par défaut. Les sauvegardes ne sont pas
+              affectées.</div>
+          </div>
+          <div class="danger-btn" style="border-color:rgba(255,165,0,0.5); color:#FFA500;" onclick="showModal('reset')">
+            RÉINITIALISER</div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">PURGER LES DONNÉES DE SESSION</div>
+            <div class="setting-desc">Supprime toutes les sauvegardes. Sparky sera réinitialisé. L'historique des fins
+              sera effacé.</div>
+          </div>
+          <div class="danger-btn" onclick="showModal('purge')">PURGER LES SESSIONS</div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <div class="setting-label">EFFACER LES MÉTRIQUES</div>
+            <div class="setting-desc">Remet à zéro les statistiques de jeu et les succès débloqués.</div>
+          </div>
+          <div class="danger-btn" onclick="showModal('metrics')">EFFACER LES MÉTRIQUES</div>
+        </div>
+
+        <div class="setting-row" style="margin-top:20px;">
+          <div class="setting-info">
+            <div class="setting-label" style="color:var(--red)">FORMATAGE COMPLET</div>
+            <div class="setting-desc" style="color:rgba(255,0,60,0.5)">⚠ NIVEAU CRITIQUE : Efface TOUTES les données.
+              Paramètres, sauvegardes, métriques, archives. L'instance Sparky sera détruite.</div>
+          </div>
+          <div class="danger-btn" style="border-width:2px; box-shadow: 0 0 10px rgba(255,0,60,0.2);"
+            onclick="showModal('format')">FORMAT TOTAL</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div id="footer">
+      <div class="status-msg" id="status-msg"></div>
+      <div class="version-tag">REVEB_OS v2.0.50 // CONFIG_MODULE 1.4.2</div>
+    </div>
+
+  </div>
+
+  <!-- MODAL -->
+  <div id="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-title" id="modal-title">CONFIRMATION REQUISE</div>
+      <div class="modal-text" id="modal-text"></div>
+      <div class="modal-btns">
+        <div class="modal-btn modal-btn-cancel" onclick="hideModal()">ANNULER</div>
+        <div class="modal-btn modal-btn-confirm" id="modal-confirm-btn">CONFIRMER</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── AUDIO ENGINE ───
+    const au = new (window.AudioContext || window.webkitAudioContext)();
+    function tone(f, tp, d, v) { try { let o = au.createOscillator(), g = au.createGain(); o.connect(g); g.connect(au.destination); o.type = tp; o.frequency.value = f; g.gain.setValueAtTime(v, au.currentTime); g.gain.exponentialRampToValueAtTime(0.001, au.currentTime + d); o.start(); o.stop(au.currentTime + d); } catch (e) { } }
+    const sfx = {
+      hover: () => tone(440, 'square', 0.05, 0.02),
+      click: () => tone(600, 'sine', 0.1, 0.05),
+      save: () => { tone(800, 'sine', 0.1, 0.04); setTimeout(() => tone(1000, 'sine', 0.1, 0.04), 80); },
+      error: () => { tone(150, 'sawtooth', 0.3, 0.1); tone(100, 'square', 0.4, 0.1); },
+      wipe: () => { for (let i = 0; i < 5; i++) setTimeout(() => tone(200 - i * 30, 'sawtooth', 0.15, 0.08), i * 60); }
+    };
+
+    document.addEventListener('click', () => au.resume(), { once: true });
+    document.querySelectorAll('.cat-btn, .back-btn, .danger-btn').forEach(el => {
+      el.addEventListener('mouseenter', () => { au.resume(); sfx.hover(); });
+    });
+
+    // ─── CLÉS LOCALSTORAGE DU JEU ───
+    const LS_SETTINGS = 'reveb2_settings';
+    const LS_SAVES = 'reveb_saves';
+    const LS_SLOT = 'reveb_active_slot';
+    const LS_STATS = 'rvb2_stats';
+    const LS_ACH = 'reveb2_achievements';
+    const LS_DASHES = 'rvb2_global_dashes';
+    const LS_DIST = 'rvb2_global_dist';
+    const LS_DEATHS = 'rvb2_global_deaths';
+    const LS_PORTALS = 'rvb2_global_portals';
+    const LS_POWER_CL = 'rvb2_power_clone';
+    const LS_POWER_RG = 'rvb2_power_regen';
+    const LS_POWER_SM = 'rvb2_power_slowmo';
+
+    const ALL_GAME_KEYS = [
+      LS_SAVES, LS_SLOT, LS_STATS, LS_ACH,
+      LS_DASHES, LS_DIST, LS_DEATHS, LS_PORTALS,
+      LS_POWER_CL, LS_POWER_RG, LS_POWER_SM
+    ];
+
+    // ─── DEFAULTS ───
+    const DEFAULTS = {
+      volMaster: 80, volSfx: 75, volMusic: 65, volUi: 50, mute: false,
+      resolution: '1920x1080', fps: '60', brightness: 100, fullscreen: false,
+      crt: true, vignette: true, scanline: true, glitch: 'normal', chroma: true, grid: true,
+      sens: 5, rumble: true,
+      colorblind: 'none', reducedMotion: false, textSize: 'normal', subtitles: true, lang: 'fr'
+    };
+
+    // ─── SAVE / LOAD ───
+    function saveSettings() {
+      const s = {
+        volMaster: parseInt(document.getElementById('vol-master').value),
+        volSfx: parseInt(document.getElementById('vol-sfx').value),
+        volMusic: parseInt(document.getElementById('vol-music').value),
+        volUi: parseInt(document.getElementById('vol-ui').value),
+        mute: document.getElementById('toggle-mute').checked,
+        resolution: document.getElementById('sel-res').value,
+        fps: document.getElementById('sel-fps').value,
+        brightness: parseInt(document.getElementById('brightness').value),
+        fullscreen: document.getElementById('toggle-fs').checked,
+        crt: document.getElementById('toggle-crt').checked,
+        vignette: document.getElementById('toggle-vignette').checked,
+        scanline: document.getElementById('toggle-scan').checked,
+        glitch: document.getElementById('sel-glitch').value,
+        chroma: document.getElementById('toggle-chroma').checked,
+        grid: document.getElementById('toggle-grid').checked,
+        sens: parseInt(document.getElementById('sens').value),
+        rumble: document.getElementById('toggle-rumble').checked,
+        colorblind: document.getElementById('sel-color').value,
+        reducedMotion: document.getElementById('toggle-motion').checked,
+        textSize: document.getElementById('sel-textsize').value,
+        subtitles: document.getElementById('toggle-sub').checked,
+        lang: document.getElementById('sel-lang').value
+      };
+      localStorage.setItem(LS_SETTINGS, JSON.stringify(s));
+      notify();
+    }
+
+    function loadSettings() {
+      let s = DEFAULTS;
+      try {
+        const stored = localStorage.getItem(LS_SETTINGS);
+        if (stored) s = { ...DEFAULTS, ...JSON.parse(stored) };
+      } catch (e) { }
+
+      // Appliquer aux contrôles
+      setSlider('vol-master', 'val-master', s.volMaster, '%');
+      setSlider('vol-sfx', 'val-sfx', s.volSfx, '%');
+      setSlider('vol-music', 'val-music', s.volMusic, '%');
+      setSlider('vol-ui', 'val-ui', s.volUi, '%');
+      document.getElementById('toggle-mute').checked = s.mute;
+
+      setSelectByValue('sel-res', s.resolution);
+      setSelectByValue('sel-fps', s.fps);
+      setSlider('brightness', 'val-bright', s.brightness, '%');
+      document.getElementById('toggle-fs').checked = s.fullscreen;
+
+      document.getElementById('toggle-crt').checked = s.crt;
+      document.getElementById('toggle-vignette').checked = s.vignette;
+      document.getElementById('toggle-scan').checked = s.scanline;
+      setSelectByValue('sel-glitch', s.glitch);
+      document.getElementById('toggle-chroma').checked = s.chroma;
+      document.getElementById('toggle-grid').checked = s.grid;
+
+      setSlider('sens', 'val-sens', s.sens, '');
+      document.getElementById('toggle-rumble').checked = s.rumble;
+
+      setSelectByValue('sel-color', s.colorblind);
+      document.getElementById('toggle-motion').checked = s.reducedMotion;
+      setSelectByValue('sel-textsize', s.textSize);
+      document.getElementById('toggle-sub').checked = s.subtitles;
+      setSelectByValue('sel-lang', s.lang);
+
+      // Appliquer les effets visuels
+      applyAllVisuals(s);
+    }
+
+    function setSlider(sliderId, valId, value, unit) {
+      const el = document.getElementById(sliderId);
+      const vl = document.getElementById(valId);
+      if (el) el.value = value;
+      if (vl) vl.textContent = value + unit;
+    }
+
+    function setSelectByValue(selectId, value) {
+      const sel = document.getElementById(selectId);
+      if (!sel) return;
+      for (let opt of sel.options) {
+        if (opt.value === value) { sel.value = value; break; }
+      }
+    }
+
+    // ─── APPLY VISUALS ───
+    function applyAllVisuals(s) {
+      document.getElementById('crt').style.opacity = s.crt ? '0.8' : '0';
+      document.getElementById('vignette').style.opacity = s.vignette ? '1' : '0';
+      document.getElementById('scanline').style.opacity = s.scanline ? '1' : '0';
+      document.getElementById('bg-grid').style.opacity = s.grid ? '1' : '0';
+      document.body.style.filter = `brightness(${s.brightness}%)`;
+      applyColorblind(s.colorblind);
+      applyReducedMotion(s.reducedMotion);
+      applyTextSize(s.textSize);
+      applyAudio();
+    }
+
+    function applyBrightness() {
+      const val = document.getElementById('brightness').value;
+      document.body.style.filter = `brightness(${val}%)`;
+      saveSettings();
+    }
+
+    function applyAudio() {
+      // Stocke dans localStorage pour que les pages de jeu puissent lire
+      const mute = document.getElementById('toggle-mute').checked;
+      const master = parseInt(document.getElementById('vol-master').value) / 100;
+      localStorage.setItem('rvb2_audio_mute', mute);
+      localStorage.setItem('rvb2_audio_master', master);
+      localStorage.setItem('rvb2_audio_sfx', parseInt(document.getElementById('vol-sfx').value) / 100);
+      localStorage.setItem('rvb2_audio_music', parseInt(document.getElementById('vol-music').value) / 100);
+      localStorage.setItem('rvb2_audio_ui', parseInt(document.getElementById('vol-ui').value) / 100);
+      saveSettings();
+    }
+
+    function applyColorblind(mode) {
+      if (mode === undefined) mode = document.getElementById('sel-color').value;
+      const filters = {
+        none: '',
+        protanopia: 'url(#protanopia)',
+        deuteranopia: 'url(#deuteranopia)',
+        tritanopia: 'url(#tritanopia)'
+      };
+      // On utilise hue-rotate comme approximation légère (filtre SVG non chargé en standalone)
+      const hues = { none: 0, protanopia: 0, deuteranopia: 5, tritanopia: 15 };
+      const bright = parseInt(document.getElementById('brightness')?.value || 100);
+      const h = hues[mode] || 0;
+      document.body.style.filter = `brightness(${bright}%) hue-rotate(${h}deg)`;
+      localStorage.setItem('rvb2_colorblind', mode);
+    }
+
+    function applyReducedMotion(val) {
+      if (val === undefined) val = document.getElementById('toggle-motion').checked;
+      if (val) {
+        document.getElementById('scanline').style.animationPlayState = 'paused';
+        document.getElementById('bg-grid').style.animationPlayState = 'paused';
+      } else {
+        document.getElementById('scanline').style.animationPlayState = 'running';
+        document.getElementById('bg-grid').style.animationPlayState = 'running';
+      }
+      localStorage.setItem('rvb2_reduced_motion', val);
+    }
+
+    function applyTextSize(val) {
+      if (val === undefined) val = document.getElementById('sel-textsize').value;
+      const scales = { small: '90%', normal: '100%', large: '112%', xlarge: '130%' };
+      document.documentElement.style.fontSize = scales[val] || '100%';
+      localStorage.setItem('rvb2_textsize', val);
+    }
+
+    // ─── TOGGLE HANDLERS ───
+    function updateSlider(el, valId) {
+      const unit = parseInt(el.max) > 10 ? '%' : '';
+      document.getElementById(valId).textContent = el.value + unit;
+    }
+
+    function toggleCRT(el) { document.getElementById('crt').style.opacity = el.checked ? '0.8' : '0'; saveSettings(); }
+    function toggleVignette(el) { document.getElementById('vignette').style.opacity = el.checked ? '1' : '0'; saveSettings(); }
+    function toggleScanline(el) { document.getElementById('scanline').style.opacity = el.checked ? '1' : '0'; saveSettings(); }
+    function toggleGrid(el) { document.getElementById('bg-grid').style.opacity = el.checked ? '1' : '0'; saveSettings(); }
+
+    function toggleFullscreen() {
+      const wantFS = document.getElementById('toggle-fs').checked;
+      if (wantFS) {
+        document.documentElement.requestFullscreen().catch(() => {
+          document.getElementById('toggle-fs').checked = false;
+        });
+      } else {
+        if (document.fullscreenElement) document.exitFullscreen();
+      }
+      saveSettings();
+    }
+
+    // ─── SECTIONS ───
+    function showSection(name, btn) {
+      sfx.click();
+      document.querySelectorAll('.settings-section').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('sec-' + name).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    // ─── STATUS MESSAGE ───
+    let statusTimeout;
+    function notify(msg, isError) {
+      const el = document.getElementById('status-msg');
+      el.textContent = msg || `[OK] PARAMÈTRE SAUVEGARDÉ — ${new Date().toLocaleTimeString('fr-FR')}`;
+      el.style.color = isError ? 'var(--red)' : 'var(--green)';
+      sfx.save();
+      clearTimeout(statusTimeout);
+      statusTimeout = setTimeout(() => { el.textContent = ''; el.style.color = 'var(--green)'; }, 3500);
+    }
+
+    function setStatus(msg, isError) {
+      const el = document.getElementById('status-msg');
+      el.textContent = msg;
+      el.style.color = isError ? 'var(--red)' : 'var(--green)';
+      clearTimeout(statusTimeout);
+      statusTimeout = setTimeout(() => { el.textContent = ''; el.style.color = 'var(--green)'; }, 5000);
+    }
+
+    // ─── MODAL ───
+    const modalConfigs = {
+      reset: {
+        title: '⚠ RÉINITIALISATION',
+        text: 'Tous les paramètres seront remis aux valeurs par défaut du système.\nVos sauvegardes et métriques restent intactes.\n\nConfirmer la réinitialisation ?',
+        action: () => {
+          localStorage.removeItem(LS_SETTINGS);
+          sfx.wipe();
+          loadSettings();
+          setStatus('[OK] PARAMÈTRES RÉINITIALISÉS — VALEURS PAR DÉFAUT RESTAURÉES');
+        }
+      },
+      purge: {
+        title: '⚠ PURGE DES SESSIONS',
+        text: 'AVERTISSEMENT CRITIQUE : Cette action supprime TOUTES les données de sauvegarde.\nSparky sera réinitialisé à l\'état de la Phase 1.\nL\'ensemble de la progression sera perdu.\n\nLe N.E.A.N.T approuve cette décision.',
+        action: () => {
+          [LS_SAVES, LS_SLOT, LS_STATS, LS_POWER_CL, LS_POWER_RG, LS_POWER_SM].forEach(k => localStorage.removeItem(k));
+          sfx.wipe();
+          setStatus('[ALERTE] SESSIONS PURGÉES — SPARKY RÉINITIALISÉ', true);
+        }
+      },
+      metrics: {
+        title: '⚠ EFFACEMENT DES MÉTRIQUES',
+        text: 'Les statistiques de jeu et tous les succès débloqués seront effacés.\nImpossible de récupérer les données après effacement.\n\nConfirmer l\'effacement ?',
+        action: () => {
+          [LS_ACH, LS_DASHES, LS_DIST, LS_DEATHS, LS_PORTALS].forEach(k => localStorage.removeItem(k));
+          sfx.wipe();
+          setStatus('[OK] MÉTRIQUES ET SUCCÈS EFFACÉS');
+        }
+      },
+      format: {
+        title: '!!! FORMATAGE TOTAL !!!',
+        text: 'ACTION IRRÉVERSIBLE DE NIVEAU CRITIQUE.\n\nL\'intégralité des données REVEB_OS sera détruite :\nSauvegardes · Métriques · Paramètres · Archives · Instance Sparky\n\nLe système reviendra à un état vierge.\nCette action simule la victoire du N.E.A.N.T.\n\nÊtes-vous certain ?',
+        action: () => { executeFormat(); }
+      }
+    };
+
+    let currentModal = null;
+
+    function showModal(type) {
+      sfx.error();
+      currentModal = type;
+      const cfg = modalConfigs[type];
+      document.getElementById('modal-title').textContent = cfg.title;
+      document.getElementById('modal-text').textContent = cfg.text;
+      document.getElementById('modal-overlay').classList.add('show');
+    }
+
+    function hideModal() {
+      document.getElementById('modal-overlay').classList.remove('show');
+      currentModal = null;
+    }
+
+    document.getElementById('modal-confirm-btn').onclick = () => {
+      if (currentModal) { modalConfigs[currentModal].action(); hideModal(); }
+    };
+
+    function executeFormat() {
+      sfx.wipe();
+      // Effacer toutes les données du jeu
+      ALL_GAME_KEYS.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem(LS_SETTINGS);
+      // Effacer aussi les clés audio
+      ['rvb2_audio_mute', 'rvb2_audio_master', 'rvb2_audio_sfx', 'rvb2_audio_music', 'rvb2_audio_ui',
+        'rvb2_colorblind', 'rvb2_reduced_motion', 'rvb2_textsize'].forEach(k => localStorage.removeItem(k));
+
+      // Effet visuel de formatage
+      document.body.style.transition = 'filter 0.2s';
+      document.body.style.filter = 'brightness(500%) contrast(300%)';
+      setTimeout(() => {
+        document.body.style.filter = 'brightness(0%)';
+        setTimeout(() => {
+          document.body.style.filter = '';
+          setStatus('[FORMATAGE COMPLET] — SYSTÈME RÉINITIALISÉ // INSTANCE SPARKY DÉTRUITE', true);
+          // Rechargement des paramètres par défaut
+          loadSettings();
+        }, 600);
+      }, 200);
+    }
+
+    // ─── NAVIGATION ───
+    function goBack() {
+      sfx.click();
+      document.body.style.opacity = '0';
+      setTimeout(() => {
+        if (window.history.length > 1) window.history.back();
+        else window.location.href = 'reveb2-intro.html';
+      }, 800);
+    }
+
+    // ─── INIT ───
+    window.addEventListener('load', () => {
+      setTimeout(() => document.body.classList.add('visible'), 50);
+      loadSettings();
+    });
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ReveB 2 — Concepts Phase 3</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Bangers&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ─── STYLES DE BASE ──────────────────────────────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#020005;overflow:hidden;width:100vw;height:100vh;font-family:'Share Tech Mono',monospace;color:#fff;}
+canvas{display:block; position:absolute; top:0; left:0; z-index:1;}
+
+/* Effets Post-Processing CSS */
+#crt{position:fixed;inset:0;z-index:90;pointer-events:none;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.25) 50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06));background-size:100% 2px, 3px 100%;opacity:0.6;}
+#vignette{position:fixed;inset:0;z-index:89;pointer-events:none;background:radial-gradient(circle at center, transparent 40%, #000 120%);}
+
+/* ─── INTERFACE DE CONTRÔLE ───────────────────────────────────────────────── */
+#ui-panel {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 15px;
+    background: rgba(10, 0, 20, 0.85);
+    padding: 15px 30px;
+    border: 2px solid #8A2BE2;
+    border-radius: 8px;
+    box-shadow: 0 0 20px rgba(138,43,226,0.4);
+    backdrop-filter: blur(5px);
+}
+
+.btn {
+    padding: 10px 20px;
+    border: 2px solid #555;
+    background: transparent;
+    color: #aaa;
+    cursor: pointer;
+    font-size: 1rem;
+    font-family: 'Orbitron', sans-serif;
+    font-weight: bold;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+}
+
+.btn:hover {
+    color: #fff;
+    border-color: #fff;
+    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+}
+
+.btn.active {
+    color: #00F5FF;
+    border-color: #00F5FF;
+    box-shadow: 0 0 15px rgba(0,245,255,0.6);
+    background: rgba(0,245,255,0.1);
+}
+
+/* ─── INFOS DEBUG ─────────────────────────────────────────────────────────── */
+#debug-info {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    z-index: 100;
+    font-size: 14px;
+    color: rgba(255,255,255,0.5);
+    pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+<div id="crt"></div>
+<div id="vignette"></div>
+
+<div id="ui-panel">
+    <button class="btn active" id="btn-1" onclick="setPhase(1)">PROP 1 (SÉRAPHIN)</button>
+    <button class="btn" id="btn-2" onclick="setPhase(2)">PROP 2 (CANON)</button>
+    <button class="btn" id="btn-3" onclick="setPhase(3)">PROP 3 (PARADOXE)</button>
+</div>
+
+<div id="debug-info">
+    <div id="fps-counter">FPS: 0</div>
+    <div id="time-counter">Temps: 0s</div>
+</div>
+
+<script>
+"use strict";
+
+// ═══════════════════════════════════════════════════════════
+//  CONFIGURATION DU CANVAS & OUTILS VISUELS
+// ═══════════════════════════════════════════════════════════
+const cv = document.getElementById('c'), cx = cv.getContext('2d', {alpha: false});
+let W, H;
+let currentPhase = 1;
+
+const K = {
+    pur: '#8A2BE2', wh: '#ffffff', bk: '#000000', 
+    gold: '#FFD700', red: '#FF003C', blue: '#00F5FF', drk: '#050011'
+};
+
+const glow = (c, b) => { cx.shadowColor = c; cx.shadowBlur = b; };
+const noGlow = () => { cx.shadowBlur = 0; };
+
+function resize() {
+    W = cv.width = innerWidth; 
+    H = cv.height = innerHeight;
+}
+window.addEventListener('resize', resize); 
+resize();
+
+function setPhase(phase) {
+    currentPhase = phase;
+    document.getElementById('btn-1').classList.remove('active');
+    document.getElementById('btn-2').classList.remove('active');
+    document.getElementById('btn-3').classList.remove('active');
+    document.getElementById(`btn-${phase}`).classList.add('active');
+}
+
+// ═══════════════════════════════════════════════════════════
+//  FONCTION DE FOND ABYSSAL COMMUNE AUX 3 PROPOSITIONS
+// ═══════════════════════════════════════════════════════════
+function drawAbyssBackground(t) {
+    const bgGrad = cx.createRadialGradient(W/2, H/2 + 100, 50, W/2, H/2, H);
+    bgGrad.addColorStop(0, `rgba(40, 0, 10, 1)`);
+    bgGrad.addColorStop(0.6, `rgba(15, 0, 5, 1)`);
+    bgGrad.addColorStop(1, `rgba(5, 0, 0, 1)`);
+    cx.fillStyle = bgGrad; cx.fillRect(0, 0, W, H);
+
+    // Pluie de Voxel (Rouge et Or corrompu)
+    cx.globalAlpha = 0.5;
+    for (let i = 0; i < 150; i++) {
+        const dropX = (Math.sin(i * 123.45) * 0.5 + 0.5) * W;
+        const dropY = ((Math.cos(i * 321.12) * 0.5 + 0.5) * H + t * (150 + (i%5)*30)) % H;
+        cx.fillStyle = `rgba(255, 0, 60, ${0.3 + (i%5)*0.1})`;
+        cx.fillRect(dropX, dropY, 4 + (i%4), 15 + (i%20));
+    }
+    cx.globalAlpha = 1;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  BOUCLE DE RENDU PRINCIPALE
+// ═══════════════════════════════════════════════════════════
+let tT = 0, lastT = 0, frames = 0, lastFpsT = 0;
+
+function draw(ts) {
+    const dt = Math.min(ts - lastT, 50) || 0; 
+    lastT = ts; tT += dt;
+    const t = tT / 1000;
+
+    frames++;
+    if (ts - lastFpsT >= 1000) {
+        document.getElementById('fps-counter').innerText = `FPS: ${frames}`;
+        frames = 0; lastFpsT = ts;
+    }
+    document.getElementById('time-counter').innerText = `Temps: ${(t).toFixed(1)}s`;
+
+    // Dessin du fond partagé
+    drawAbyssBackground(t);
+
+    const centerX = W / 2;
+    const bossY = 180;
+
+    // Tremblement global (impact du laser)
+    cx.save();
+    cx.translate((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+
+    // ─── LE LASER CENTRAL (Commun aux 3 concepts) ───
+    const beatPulse = Math.pow(Math.sin(t * Math.PI * 4), 2);
+    const beamWidth = 140 + beatPulse * 20;
+    
+    cx.globalCompositeOperation = "screen";
+    glow(K.red, 60);
+    cx.fillStyle = `rgba(255, 0, 40, 0.8)`;
+    cx.fillRect(centerX - beamWidth/2, bossY, beamWidth, H);
+    
+    glow('#fff', 20);
+    cx.fillStyle = '#fff';
+    cx.fillRect(centerX - beamWidth/4, bossY, beamWidth/2, H);
+    cx.globalCompositeOperation = "source-over";
+    noGlow();
+
+
+    // ═══════════════════════════════════════════════════════════
+    //  PROPOSITION 1 : LE SÉRAPHIN NUMÉRIQUE (L'Ange)
+    // ═══════════════════════════════════════════════════════════
+    if (currentPhase === 1) {
+        cx.save();
+        cx.translate(centerX, bossY - 50 + Math.sin(t*2)*15);
+
+        // Aile Gauche (SYNC - Rouge, Polygons saccadés)
+        cx.save();
+        cx.translate(-40, 0);
+        const flapL = Math.sin(t*10)*0.1;
+        cx.scale(1 - flapL, 1);
+        glow(K.red, 30); cx.fillStyle = 'rgba(255, 0, 60, 0.15)'; cx.strokeStyle = K.red; cx.lineWidth = 3;
+        cx.beginPath(); cx.moveTo(0, 0); cx.lineTo(-180, -120); cx.lineTo(-260, -40); cx.lineTo(-120, 80); cx.lineTo(-220, 160); cx.lineTo(0, 60); cx.closePath();
+        cx.fill(); cx.stroke();
+        // Nervures géométriques
+        cx.beginPath(); cx.moveTo(0,0); cx.lineTo(-160, -50); cx.moveTo(0,0); cx.lineTo(-150, 60); cx.stroke();
+        cx.restore();
+
+        // Aile Droite (ASYNC - Bleu, Ondes fluides)
+        cx.save();
+        cx.translate(40, 0);
+        const flapR = Math.sin(t*3)*0.2;
+        cx.scale(1 + flapR, 1);
+        glow(K.blue, 30); cx.fillStyle = 'rgba(0, 245, 255, 0.15)'; cx.strokeStyle = K.blue; cx.lineWidth = 3;
+        cx.beginPath(); cx.moveTo(0, 0); 
+        cx.bezierCurveTo(100, -150, 200, -150, 260, -40);
+        cx.bezierCurveTo(150, 20, 250, 100, 220, 160);
+        cx.bezierCurveTo(100, 100, 50, 80, 0, 60); cx.closePath();
+        cx.fill(); cx.stroke();
+        // Nervures fluides
+        cx.beginPath(); cx.moveTo(0,0); cx.quadraticCurveTo(100, -50, 180, -60); cx.moveTo(0,0); cx.quadraticCurveTo(100, 50, 170, 80); cx.stroke();
+        cx.restore();
+
+        // Corps (Noyau Cristal Magenta divin)
+        glow(K.pur, 50);
+        cx.fillStyle = `rgba(138,43,226, 0.8)`;
+        cx.beginPath(); cx.moveTo(0, -60); cx.lineTo(40, 0); cx.lineTo(0, 80); cx.lineTo(-40, 0); cx.closePath(); cx.fill();
+        cx.strokeStyle = '#fff'; cx.lineWidth = 4; cx.stroke();
+        
+        // Halo de fusion au centre (Création du laser)
+        cx.globalCompositeOperation = 'screen';
+        glow('#fff', 40); cx.fillStyle = '#fff';
+        cx.beginPath(); cx.arc(0, 60, 25 + Math.random()*10, 0, Math.PI*2); cx.fill();
+        cx.globalCompositeOperation = 'source-over';
+
+        cx.restore();
+    } 
+    // ═══════════════════════════════════════════════════════════
+    //  PROPOSITION 2 : LE CANON QUANTIQUE (Machinerie)
+    // ═══════════════════════════════════════════════════════════
+    else if (currentPhase === 2) {
+        
+        // Hélice d'ADN Énergétique autour du laser
+        cx.save();
+        cx.globalCompositeOperation = "screen";
+        cx.lineWidth = 8;
+        for(let y = bossY; y < H; y += 15) {
+            const wave1 = Math.sin(y * 0.02 - t * 15) * 100;
+            const wave2 = Math.sin(y * 0.02 - t * 15 + Math.PI) * 100;
+            glow(K.red, 20); cx.fillStyle = K.red; cx.beginPath(); cx.arc(centerX + wave1, y, 6, 0, Math.PI*2); cx.fill();
+            glow(K.blue, 20); cx.fillStyle = K.blue; cx.beginPath(); cx.arc(centerX + wave2, y, 6, 0, Math.PI*2); cx.fill();
+        }
+        cx.restore();
+
+        cx.save();
+        cx.translate(centerX, bossY - 50);
+
+        // Rotor Gauche (Rouge, Saccadé)
+        cx.save(); cx.translate(-110, -20);
+        cx.rotate(Math.floor(t*15)*0.3); // Rotation mécanique
+        glow(K.red, 30); cx.fillStyle = '#110'; cx.strokeStyle = K.red; cx.lineWidth = 4;
+        cx.beginPath(); cx.arc(0, 0, 50, 0, Math.PI*2); cx.fill(); cx.stroke();
+        for(let i=0; i<4; i++) { cx.rotate(Math.PI/2); cx.fillRect(-10, -70, 20, 30); }
+        cx.restore();
+
+        // Rotor Droit (Bleu, Fluide)
+        cx.save(); cx.translate(110, -20);
+        cx.rotate(-t*5); // Rotation fluide
+        glow(K.blue, 30); cx.fillStyle = '#001'; cx.strokeStyle = K.blue; cx.lineWidth = 4;
+        cx.beginPath(); cx.arc(0, 0, 50, 0, Math.PI*2); cx.fill(); cx.stroke();
+        for(let i=0; i<8; i++) { cx.rotate(Math.PI/4); cx.beginPath(); cx.moveTo(0,0); cx.lineTo(0, -65); cx.stroke(); }
+        cx.restore();
+
+        // Barillet Central Noir Lourd
+        glow('#000', 40);
+        cx.fillStyle = '#050505'; cx.strokeStyle = '#333'; cx.lineWidth = 4;
+        cx.beginPath(); cx.moveTo(-60, -80); cx.lineTo(60, -80); cx.lineTo(80, 40); cx.lineTo(40, 80); cx.lineTo(-40, 80); cx.lineTo(-80, 40); cx.closePath();
+        cx.fill(); cx.stroke();
+
+        // Cœur du canon en surchauffe
+        glow('#fff', 30); cx.fillStyle = '#fff';
+        cx.beginPath(); cx.ellipse(0, 60, 20 + Math.random()*5, 10, 0, 0, Math.PI*2); cx.fill();
+
+        cx.restore();
+    } 
+    // ═══════════════════════════════════════════════════════════
+    //  PROPOSITION 3 : LE PARADOXE (Visage Déchiré)
+    // ═══════════════════════════════════════════════════════════
+    else if (currentPhase === 3) {
+        cx.save();
+        cx.translate(centerX, bossY - 80);
+
+        const glitchSplit = Math.sin(t * 25) * 8 + 10; // Déchirement instable
+        const size = 100;
+
+        cx.lineWidth = 6;
+        cx.lineCap = 'round';
+        cx.lineJoin = 'round';
+
+        // Moitié Gauche (Rouge - Fâché - Lignes Dures)
+        cx.save();
+        cx.translate(-glitchSplit, Math.random()*5); // Secousse
+        glow(K.red, 30); cx.strokeStyle = K.red; cx.fillStyle = 'rgba(40,0,0,0.8)';
+        cx.beginPath(); 
+        cx.moveTo(0, -size*1.2); cx.lineTo(-size, -size); cx.lineTo(-size*1.2, 0); cx.lineTo(-size, size); cx.lineTo(0, size*1.5);
+        // Faille du milieu (zig-zag)
+        cx.lineTo(-10, size*0.8); cx.lineTo(15, size*0.2); cx.lineTo(-20, -size*0.3); cx.closePath();
+        cx.fill(); cx.stroke();
+        // Œil Fâché
+        cx.beginPath(); cx.moveTo(-size*0.7, -size*0.3); cx.lineTo(-size*0.2, -size*0.1); cx.lineTo(-size*0.6, size*0.1); cx.stroke();
+        cx.restore();
+
+        // Moitié Droite (Bleu - Calme - Lignes Courbes)
+        cx.save();
+        cx.translate(glitchSplit, 0);
+        glow(K.blue, 30); cx.strokeStyle = K.blue; cx.fillStyle = 'rgba(0,0,40,0.8)';
+        cx.beginPath(); 
+        cx.moveTo(0, -size*1.2); cx.quadraticCurveTo(size*1.5, -size*1.5, size*1.2, 0); cx.quadraticCurveTo(size*1.5, size*1.5, 0, size*1.5);
+        // Faille du milieu (complémentaire)
+        cx.lineTo(-10, size*0.8); cx.lineTo(15, size*0.2); cx.lineTo(-20, -size*0.3); cx.closePath();
+        cx.fill(); cx.stroke();
+        // Œil Endormi
+        cx.beginPath(); cx.moveTo(size*0.2, -size*0.1); cx.quadraticCurveTo(size*0.45, size*0.1, size*0.7, -size*0.1); cx.stroke();
+        cx.restore();
+
+        // La Bouche (Origine du laser, hurlement dans la déchirure)
+        glow('#fff', 40); cx.fillStyle = '#fff';
+        cx.beginPath(); cx.ellipse(0, size*1.2, 25 + Math.random()*15, 30 + Math.random()*10, 0, 0, Math.PI*2); cx.fill();
+
+        cx.restore();
+    }
+
+    cx.restore(); // Fin du tremblement
+    requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+
+</script>
+</body>
+</html>
